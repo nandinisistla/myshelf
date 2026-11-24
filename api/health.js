@@ -1,9 +1,9 @@
 // Quick setup check: open /api/health in the browser.
-import { q } from '../lib/db.js';
+import { q, databaseUrl } from '../lib/db.js';
 
 export default async function handler(req, res) {
   const out = {
-    database_configured: Boolean(process.env.DATABASE_URL || process.env.POSTGRES_URL),
+    database_configured: Boolean(databaseUrl()),
     database_ok: false,
     ai_key_set: Boolean(process.env.ANTHROPIC_API_KEY),
     owner_key_set: Boolean(process.env.OWNER_KEY),
