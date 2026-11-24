@@ -1,168 +1,136 @@
-// History: a drawing-sheet timeline of what you used and when your skin reacted,
-// plus a log of every change (by you or the AI).
+// History: your skin story as a simple diary, newest first.
+// Bad days show what you were using in the week before, so the link explains itself.
 import { h, put, fmtDate, fmtTime, localDay, addDays, daysBetween, howLong, AREAS, SEVERITY } from './ui.js';
-import { store, S } from './store.js';
+import { store } from './store.js';
 import { openProduct } from './product.js';
 import { openBadDay } from './reaction.js';
+import { imageSrc, prepare, drawBottle } from './bottle.js';
 
-let range = 0;   // all time by default
-let selected;   // undefined = not chosen yet: start with the latest bad day
-const pad = (n) => String(n).padStart(2, '0');
-const MON = (iso) => new Date(iso + 'T12:00:00Z').toLocaleDateString('en-US', { month: 'short', timeZone: 'UTC' }).toUpperCase();
-const DD = (iso) => iso.slice(8, 10);
-const short = (iso) => `${DD(iso)} ${MON(iso)}`;
+const AREA_WORD = { face: 'face', scalp: 'scalp', body: 'body' };
+const MONTH = (key) => new Date(key + '-15T12:00:00Z').toLocaleDateString('en-US', { month: 'long', timeZone: 'UTC' });
+const WEEKDAY = (iso) => new Date(iso + 'T12:00:00Z').toLocaleDateString('en-US', { weekday: 'short', timeZone: 'UTC' });
+
+let onlyBad = false;
 
 export function renderHistory(view) {
   const st = store.state;
-  if (selected && !st.reactions.some((r) => r.id === selected)) selected = undefined;
-  const [start, end] = bounds();
-  const inRange = st.reactions.filter((r) => r.date >= start && r.date <= end);
-  if (selected === undefined) selected = inRange[0]?.id ?? null;   // reactions come newest first
+  const R = st.reactions;
+  const inUse = st.products.filter((p) => !p.stopped).length;
+  const first = [...st.products.map((p) => p.started), ...R.map((r) => r.date)].filter(Boolean).sort()[0];
 
   put(view,
-    h('div', { class: 'sheet-label mono' }, 'History · Section A–A'),
-    h('section', { class: 'drawing' }, rail(inRange.length), main(start, end, inRange)),
-    h('div', { class: 'under mono' }, h('span', null, `Timeline · ${range ? range + '-day' : 'full'} chart`), h('span', null, 'Click any amber dot to see what you used the week before')),
-    h('div', { class: 'sheet-label mono' }, 'Log · Everything that happened'),
-    log());
+    h('section', { class: 'page-head' },
+      h('div', { class: 'eyebrow mono' }, `History · since ${first ? fmtDate(first, true) : 'today'}`),
+      h('h1', { class: 'display' }, 'Your skin story', h('span', { class: 'soft' }, '.')),
+      h('p', { class: 'lede' }, R.length
+        ? `${R.length} bad day${R.length === 1 ? '' : 's'}, ${inUse} product${inUse === 1 ? '' : 's'} in use. Every bad day shows what you were using the week before.`
+        : 'Every product you start or stop shows up here. Log a bad day and you’ll see what you were using the week before.')),
+    headline(st),
+    h('div', { class: 'hs-filter' },
+      h('button', { class: 'chip' + (onlyBad ? '' : ' on'), onclick: () => { onlyBad = false; renderHistory(view); } }, 'Everything'),
+      h('button', { class: 'chip' + (onlyBad ? ' on' : ''), onclick: () => { onlyBad = true; renderHistory(view); } }, 'Bad days only')),
+    feed(st),
+    h('details', { class: 'hs-log' },
+      h('summary', { class: 'mono' }, 'Every change, including edits and the AI chat'),
+      log()));
 }
 
-function bounds() {
-  const st = store.state;
-  const end = st.today;
-  if (range) return [addDays(end, -range + 1), end];
-  const dates = [...st.products.map((p) => p.started).filter(Boolean), ...st.reactions.map((r) => r.date)].sort();
-  const first = dates[0] && dates[0] < addDays(end, -30) ? dates[0] : addDays(end, -30);
-  return [addDays(first, -4), end];
-}
-
-function rail(badCount) {
-  const st = store.state;
-  const inUse = st.products.filter((p) => !p.stopped).length;
-  const item = (n, k, extra = {}) => h(extra.onclick ? 'button' : 'div', { class: 'rail-item' + (extra.on ? ' on' : '') + (extra.last ? ' last' : ''), onclick: extra.onclick, 'aria-pressed': extra.onclick ? String(Boolean(extra.on)) : null },
-    h('div', { class: 'n' }, n), h('div', { class: 'k' }, k));
-  const setRange = (v) => () => { range = v; renderHistory(document.getElementById('view')); };
-  return h('aside', { class: 'rail' },
-    h('div', { class: 'logo' }, 'My', 'S', h('span', { class: 'h' }, 'h'), 'elf'),
-    item(pad(inUse), 'In use'),
-    item(pad(badCount), 'Bad days'),
-    item(pad(st.insights.suspectFamilies.length), 'Triggers', { last: true }),
-    h('div', { class: 'spacer' }),
-    item('30', 'Days', { onclick: setRange(30), on: range === 30 }),
-    item('90', 'Days', { onclick: setRange(90), on: range === 90 }),
-    item('All', 'Time', { onclick: setRange(0), on: range === 0, last: true }),
-    h('div', { class: 'gap' }),
-    h('div', { class: 'foot' }, h('div', { class: 'k' }, 'Today'), h('div', { class: 'n' }, short(st.today))));
-}
-
-function ticks(start, end) {
-  const span = daysBetween(start, end);
-  const out = [];
-  for (let i = 0; i <= span; i++) {
-    const d = addDays(start, i);
-    const day = Number(DD(d));
-    const dow = new Date(d + 'T12:00:00Z').getUTCDay();
-    const keep = span <= 40 ? dow === 1 : span <= 120 ? (day === 1 || day === 15) : (day === 1 && (span <= 240 || Number(d.slice(5, 7)) % 2 === 1));
-    if (keep) out.push(d);
+// The one thing worth knowing, in a sentence.
+function headline(st) {
+  const R = st.reactions;
+  if (R.length < 2) return null;
+  const count = new Map();
+  for (const w of st.insights.windows || []) for (const id of w.productIds) count.set(id, (count.get(id) || 0) + 1);
+  let best = null;
+  for (const p of st.products) {
+    const n = count.get(p.id) || 0;
+    const total = R.filter((r) => r.area === p.area).length;
+    if (n < 2 || n / total < 0.6) continue;
+    if (!best || n > best.n || (n === best.n && n / total > best.n / best.total)) best = { p, n, total };
   }
-  return out;
+  if (!best) return null;
+  const { p, n, total } = best;
+  const area = AREA_WORD[p.area];
+  const after = R.filter((r) => r.area === p.area && p.stopped && r.date > p.stopped).length;
+  const calm = p.stopped && after === 0 && daysBetween(p.stopped, st.today) >= 14;
+  return h('button', { class: 'hs-headline', onclick: () => openProduct(p) },
+    thumb(p, 'lg'),
+    h('div', null,
+      h('div', { class: 'mono' }, 'Pattern'),
+      h('p', null,
+        h('b', null, p.name), ` was in use before ${n === total ? 'every one' : n} of your ${total} ${area} bad days.`,
+        calm ? ` Since you stopped it on ${fmtDate(p.stopped)}, your ${area} hasn’t acted up once.` : '')));
 }
 
-function main(start, end, reactions) {
-  const st = store.state;
-  const span = Math.max(1, daysBetween(start, end));
-  const x = (d) => (Math.max(0, Math.min(span, daysBetween(start, d))) / span) * 100;
-  const sus = S.suspects();
-  const sel = st.reactions.find((r) => r.id === selected);
-  const win = sel ? st.insights.windows.find((w) => w.reaction.id === sel.id) : null;
-  const inWin = new Set(win ? win.productIds : []);
+function feed(st) {
+  const items = [];
+  for (const r of st.reactions) items.push({ date: r.date, kind: 'bad', order: 0, r });
+  if (!onlyBad) for (const p of st.products) {
+    if (p.stopped) items.push({ date: p.stopped, kind: 'stop', order: 1, p });
+    if (p.started) items.push({ date: p.started, kind: 'start', order: 2, p });
+  }
+  if (!items.length) return h('div', { class: 'empty' }, h('h3', null, 'Nothing here yet'), h('p', null, 'Add products to your shelf and your story starts here.'));
+  items.sort((a, b) => b.date.localeCompare(a.date) || a.order - b.order);
 
-  const products = st.products
-    .filter((p) => (p.started || st.today) <= end && (!p.stopped || p.stopped >= start))
-    .sort((a, b) => (a.started || '').localeCompare(b.started || '') || a.id - b.id);
+  const months = [];
+  for (const it of items) {
+    const key = it.date.slice(0, 7);
+    if (!months.length || months[months.length - 1].key !== key) months.push({ key, items: [] });
+    months[months.length - 1].items.push(it);
+  }
+  return h('div', { class: 'hs-feed' }, months.map((m) => {
+    const bad = m.items.filter((i) => i.kind === 'bad').length;
+    return h('section', { class: 'hs-month' },
+      h('header', null,
+        h('h2', null, MONTH(m.key), ' ', h('span', { class: 'yr' }, m.key.slice(0, 4))),
+        h('span', { class: 'mono' }, bad ? `${bad} bad day${bad === 1 ? '' : 's'}` : 'No bad days')),
+      m.items.map((it) => entry(it, st)));
+  }));
+}
 
-  const select = (id) => { selected = selected === id ? null : id; renderHistory(document.getElementById('view')); };
-  const tickDates = ticks(start, end).filter((d) => x(d) > 2 && x(d) < 96);
+function entry(it, st) {
+  const when = h('div', { class: 'hs-when' }, h('div', { class: 'd' }, it.date.slice(8, 10)), h('div', { class: 'mono' }, WEEKDAY(it.date)));
+  const shelf = (p) => st.routines.find((r) => r.id === p.routine_id)?.name;
 
-  // Header: dates and bad days on one axis
-  const axis = h('div', { class: 'g-axis' },
-    h('div', { class: 'g-lane' }),
-    h('div', { class: 'g-line' }),
-    tickDates.map((d) => h('div', { class: 'tick', style: `left:${x(d)}%` }, h('i'), h('div', { class: 'd' }, DD(d)), h('div', { class: 'm' }, MON(d)))),
-    reactions.map((r) => h('button', { class: `badday sev${r.severity}` + (r.id === selected ? ' on' : ''), style: `left:${x(r.date)}%`,
-      title: `${fmtDate(r.date)} · ${AREAS[r.area]} · ${SEVERITY[r.severity]}`, 'aria-label': `Bad day ${fmtDate(r.date)}, ${AREAS[r.area]}`, onclick: () => select(r.id) })));
+  if (it.kind === 'bad') {
+    const r = it.r;
+    const win = (st.insights.windows || []).find((w) => w.reaction.id === r.id);
+    const used = (win?.productIds || []).map((id) => st.products.find((p) => p.id === id)).filter(Boolean);
+    const area = AREA_WORD[r.area];
+    return h('article', { class: `hs-row bad sev${r.severity}` }, when,
+      h('span', { class: 'hs-mark', 'aria-hidden': 'true' }),
+      h('div', { class: 'hs-body' },
+        h('button', { class: 'hs-title', onclick: () => openBadDay(r) },
+          `Your ${area} acted up`, h('span', { class: 'sev' }, SEVERITY[r.severity])),
+        r.note ? h('p', { class: 'hs-note' }, `“${r.note}”`) : null,
+        h('div', { class: 'hs-used' },
+          h('div', { class: 'mono' }, used.length ? `On your ${area}, the week before` : `Nothing on your ${area} the week before`),
+          used.length ? h('div', { class: 'hs-chips' }, used.map((p) => h('button', { class: 'hs-chip', onclick: () => openProduct(p) }, thumb(p), h('span', null, p.name)))) : null)));
+  }
 
-  // Guides drawn behind the rows
-  const overlay = h('div', { class: 'g-overlay', 'aria-hidden': 'true' },
-    tickDates.map((d) => h('div', { class: 'vline', style: `left:${x(d)}%` })),
-    reactions.map((r) => {
-      const from = addDays(r.date, -7);
-      return h('div', { class: 'window' + (r.id === selected ? ' on' : ''), style: `left:${x(from)}%;width:${Math.max(0.6, x(r.date) - x(from))}%` });
-    }),
-    reactions.map((r) => h('div', { class: 'badday-line', style: `left:${x(r.date)}%` })));
+  const p = it.p;
+  const stop = it.kind === 'stop';
+  const today = p.started === st.today && !stop;
+  return h('article', { class: 'hs-row ' + it.kind }, when,
+    h('span', { class: 'hs-mark', 'aria-hidden': 'true' }),
+    h('button', { class: 'hs-body hs-product', onclick: () => openProduct(p) },
+      thumb(p),
+      h('div', null,
+        h('div', { class: 'hs-line' }, stop ? 'Stopped ' : today ? 'Added ' : 'Started ', h('b', null, p.name)),
+        h('div', { class: 'mono' }, [p.brand, shelf(p) ? `${shelf(p)} shelf` : AREAS[p.area],
+          stop && p.started ? `used ${howLong(p.started, p.stopped)}` : null].filter(Boolean).join(' · ')))));
+}
 
-  const rows = products.map((p) => {
-    const s0 = p.started && p.started > start ? p.started : start;
-    const e0 = p.stopped && p.stopped < end ? p.stopped : end;
-    const left = x(s0), right = x(e0);
-    const width = right - left;
-    const hasSus = (p.ingredients || []).some((i) => sus.has(i.family));
-    const state = sel ? (inWin.has(p.id) ? ' hot' : ' dim') : '';
-    const since = p.started === st.today ? 'Added today' : `${short(p.started || st.today)} → ${p.stopped ? short(p.stopped) : 'now'}`;
-    const dur = p.started === st.today ? '' : ` · ${howLong(p.started || st.today, p.stopped || st.today)}`;
-    const tagRight = left > 62;
-    return h('div', { class: 'g-row' + state },
-      h('div', { class: 'g-lab' },
-        h('div', { class: 'mono' }, [p.brand, AREAS[p.area]].filter(Boolean).join(' · ')),
-        h('button', { class: 'nm', onclick: () => openProduct(p), title: p.name }, p.name)),
-      h('div', { class: 'g-track' },
-        width < 1.2
-          ? h('span', { class: 'g-dot' + (hasSus ? ' sus' : ''), style: `left:${left}%` })
-          : h('div', { class: 'g-bar' + (p.stopped ? '' : ' open') + (hasSus ? ' sus' : ''), style: `left:${left}%;width:${width}%` }),
-        h('div', { class: 'g-tag mono' + (tagRight ? ' r' : ''), style: tagRight ? `right:${100 - left + 1.2}%` : `left:${left}%` },
-          since + dur, sel && inWin.has(p.id) ? h('span', { class: 'inwin' }, ' · in window') : null)));
+// A small product picture, blended onto the page like on the shelf.
+function thumb(p, size = '') {
+  const box = h('span', { class: 'hs-thumb ' + size + (p.stopped ? ' past' : '') });
+  const src = imageSrc(p);
+  if (!src) { box.append(drawBottle(p)); return box; }
+  prepare(src).then(({ url, blend }) => {
+    box.classList.toggle('blend', blend);
+    box.append(h('img', { src: url, alt: '', draggable: 'false' }));
   });
-
-  return h('div', { class: 'sheet-main' },
-    h('div', { class: 'eyebrow mono' }, 'Section A–A'),
-    h('h1', null, 'What you used, and when your skin reacted'),
-    h('div', { class: 'thick' }),
-    legend(),
-    selectedCard(),
-    products.length || reactions.length
-      ? h('div', { class: 'gantt' },
-          h('div', { class: 'g-head' }, h('div', { class: 'g-lab' }, h('div', { class: 'mono g-lane-l' }, 'Bad days'), h('div', { class: 'mono' }, 'Product')), axis),
-          h('div', { class: 'g-body' }, overlay, rows))
-      : h('div', { class: 'empty' }, h('h3', null, 'Nothing here yet'), h('p', null, 'Add products to your shelf. The timeline draws itself from there.')),
-    h('div', { class: 'sheet-foot-row mono' }, h('span', null, `Process · ${pad(products.length)} products`), h('span', null, `${short(start)} — ${short(end)}`)));
-}
-
-// A plain key, so the drawing explains itself.
-function legend() {
-  const item = (mark, text) => h('div', { class: 'lg-item' }, h('span', { class: 'lg-mark ' + mark, 'aria-hidden': 'true' }), h('span', null, text));
-  return h('div', { class: 'legend-wrap' },
-    h('p', { class: 'how' }, 'For each bad day, MyShelf looks at what you used on that same area in the week before. Ingredients that keep turning up in those weeks become suspects.'),
-    h('div', { class: 'legend' },
-      item('dot', 'Bad day (bigger = worse)'),
-      item('band', 'The week before a bad day'),
-      item('bar', 'Product: started → stopped'),
-      item('bar open', 'Still using it'),
-      item('bar sus', 'Has a likely trigger')));
-}
-
-function selectedCard() {
-  const st = store.state;
-  const r = st.reactions.find((x) => x.id === selected);
-  if (!r) return null;
-  const win = st.insights.windows.find((w) => w.reaction.id === r.id);
-  const used = (win?.productIds || []).map((id) => S.product(id)).filter(Boolean);
-  return h('div', { class: 'selected-card' },
-    h('div', null, h('div', { class: 'mono' }, `Selected bad day · ${SEVERITY[r.severity]}`), h('h3', null, `${fmtDate(r.date, true)} · ${AREAS[r.area]}`)),
-    h('div', null, h('button', { class: 'btn small', onclick: () => openBadDay(r) }, 'Edit')),
-    r.note ? h('div', { class: 'note' }, `“${r.note}”`) : null,
-    h('div', { class: 'used' },
-      h('span', { class: 'mono', style: 'align-self:center;margin-right:6px' }, used.length ? `On your ${AREAS[r.area].toLowerCase()} between ${fmtDate(addDays(r.date, -7))} and ${fmtDate(r.date)}, you used:` : `Nothing on your ${AREAS[r.area].toLowerCase()} in the 7 days before`),
-      used.map((p) => h('button', { class: 'chip', onclick: () => openProduct(p) }, p.name))));
+  return box;
 }
 
 function log() {
@@ -171,7 +139,7 @@ function log() {
   return h('div', { class: 'log' }, ev.map((e) => {
     const day = localDay(e.at);
     return h('div', { class: 'log-row' },
-      h('span', { class: 'when' }, `${short(day)} · ${fmtTime(e.at)}`),
+      h('span', { class: 'when' }, `${fmtDate(day, true)} · ${fmtTime(e.at)}`),
       h('span', { class: 'what' + (e.kind.startsWith('reaction') ? ' bad' : '') }, e.summary),
       h('span', { class: 'src' }, e.source === 'chat' ? 'AI chat' : 'You'));
   }));
