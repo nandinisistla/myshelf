@@ -1,6 +1,7 @@
 // Skin profile (used to explain ingredients "for you") and owner tools.
 import { h, toast, openSheet, confirmSheet } from './ui.js';
 import { store, mutate, admin } from './store.js';
+import { loadDemo, clearDemo } from './demo.js';
 
 const SKIN = ['Dry', 'Oily', 'Combination', 'Normal', 'Sensitive'];
 
@@ -43,6 +44,7 @@ export function openSettings() {
   const form = profileForm(() => {}, false);
   const key = h('input', { class: 'input', type: 'password', placeholder: 'Owner passcode', autocomplete: 'off' });
   const ownerErr = h('div', { class: 'err' });
+  const demoStatus = h('p', { class: 'small', style: 'font-family:var(--mono);margin:4px 0' });
   const run = async (action, msg, warn) => {
     if (warn && !(await confirmSheet(warn, 'Reset'))) return;
     try { await admin(action, key.value); toast(msg); ownerErr.textContent = ''; } catch (e) { ownerErr.textContent = e.message; }
@@ -62,6 +64,21 @@ export function openSettings() {
       h('div', { class: 'p-actions' },
         h('button', { class: 'btn small', onclick: () => run('save', 'Backup saved') }, 'Save backup'),
         h('button', { class: 'btn small', onclick: () => run('restore', 'Shelf reset to your backup', 'Reset the whole app to your saved backup? Changes made since then will be lost.') }, 'Reset to backup')),
+      h('div', { class: 'section-h' }, 'Demo history'),
+      h('p', { class: 'muted small' }, 'Fill MyShelf with five months of example history: your routine dated back to the summer, three past products, and eight bad days, so the timeline and patterns have something to show. Each product is looked up for real, so it takes a minute or two. Your own products stay as they are, and you can remove the demo in one click.'),
+      demoStatus,
+      h('div', { class: 'p-actions' },
+        h('button', { class: 'btn small primary', onclick: async (e) => {
+          const btn = e.currentTarget; btn.disabled = true; ownerErr.textContent = '';
+          try {
+            await loadDemo(key.value, (msg, n, total) => { demoStatus.textContent = total ? `${msg} · ${n} of ${total}` : msg; toast(msg); });
+          } catch (ex) { ownerErr.textContent = ex.message; }
+          btn.disabled = false;
+        } }, 'Add demo history'),
+        h('button', { class: 'btn small', onclick: async () => {
+          if (!(await confirmSheet('Remove all demo products and demo bad days? Your own entries stay.', 'Remove'))) return;
+          try { await clearDemo(key.value); toast('Demo history removed'); demoStatus.textContent = ''; } catch (ex) { ownerErr.textContent = ex.message; }
+        } }, 'Remove demo history')),
     ],
   });
 }

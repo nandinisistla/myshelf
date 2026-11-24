@@ -38,9 +38,10 @@ export async function refreshInsights() {
   set(await call('/api/insights', { method: 'POST', body: JSON.stringify({ today: todayISO() }) }));
   return store.state;
 }
-export async function admin(action, key) {
-  set(await call('/api/admin', { method: 'POST', body: JSON.stringify({ action, key, today: todayISO() }) }));
-  return store.state;
+export async function admin(action, key, extra = {}) {
+  const r = await call('/api/admin', { method: 'POST', body: JSON.stringify({ ...extra, action, key, today: todayISO() }) });
+  set(r);
+  return r;
 }
 export async function findPhotos(id, auto = false) {
   const r = await call('/api/photos', { method: 'POST', body: JSON.stringify({ id, auto, today: todayISO() }) });
