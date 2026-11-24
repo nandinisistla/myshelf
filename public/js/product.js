@@ -1,7 +1,7 @@
 // Product page: the bottle, when you used it, and every ingredient in plain words.
-import { h, toast, confirmSheet, openSheet, fmtDate, howLong, AREAS, compressImage } from './ui.js';
-import { store, mutate, S, onChange } from './store.js';
-import { renderBottle } from './bottle.js';
+import { h, put, toast, confirmSheet, openSheet, fmtDate, howLong, AREAS, compressImage } from './ui.js';
+import { store, mutate, S, onChange, findPhotos } from './store.js';
+import { renderBottle, rankImages } from './bottle.js';
 
 export function openProduct(prod) {
   let mode = 'plain';
@@ -124,8 +124,8 @@ export function openProduct(prod) {
   }
 
   function pickPicture(p, fileInput) {
-    const opts = p.image_options || [];
     const credit = (o) => (o.source === 'Open Beauty Facts' ? 'Photo: Open Beauty Facts (CC BY-SA)' : `Image: ${o.source}`);
+    let opts = [...(p.image_options || [])];
     const choose = async (o) => {
       try {
         if (p.has_photo) await mutate('product.photo', { id: p.id, data: null });
@@ -133,19 +133,36 @@ export function openProduct(prod) {
         pk.close(); toast('Picture updated');
       } catch (e) { toast(e.message); }
     };
+    const grid = h('div', { class: 'picker wrap' });
+    const status = h('p', { class: 'muted small' });
+    const draw = () => put(grid,
+      opts.map((o, i) => h('button', { class: 'pick' + (!p.has_photo && p.image_url === o.url ? ' on' : ''), onclick: () => choose(o) },
+        h('img', { src: `/api/lookup?img=${encodeURIComponent(o.url)}`, alt: '', loading: 'lazy', onerror: (e) => e.target.closest('.pick').remove() }),
+        h('span', null, i === 0 && o.score !== undefined ? 'Best match' : o.source))),
+      h('button', { class: 'pick' + (p.has_photo ? ' on' : ''), onclick: () => { pk.close(); fileInput.click(); } },
+        h('div', { class: 'pick-icon' }, '+'), h('span', null, p.has_photo ? 'New photo' : 'My photo')));
+    const rank = async () => { opts = await rankImages(opts); draw(); };
+    const more = h('button', { class: 'btn small', onclick: async (e) => {
+      const btn = e.currentTarget;
+      btn.disabled = true;
+      status.textContent = 'Looking for cleaner photos on the brand’s site and big retailers…';
+      try {
+        opts = await findPhotos(p.id);
+        status.textContent = opts.length ? 'Sorted with the cleanest, sharpest photo first.' : 'No other photos found. Try your own photo.';
+        await rank();
+      } catch (err) { status.textContent = err.message; }
+      btn.disabled = false;
+    } }, 'Find better photos');
     const pk = openSheet({
       title: 'Change picture',
       body: [
-        opts.length ? h('p', { class: 'muted' }, 'Pictures found online for this product:') : h('p', { class: 'muted' }, 'No pictures were found online for this product. Add your own photo.'),
-        h('div', { class: 'picker' },
-          opts.map((o) => h('button', { class: 'pick' + (!p.has_photo && p.image_url === o.url ? ' on' : ''), onclick: () => choose(o) },
-            h('img', { src: `/api/lookup?img=${encodeURIComponent(o.url)}`, alt: '', loading: 'lazy', onerror: (e) => e.target.closest('.pick').remove() }),
-            h('span', null, o.source))),
-          h('button', { class: 'pick' + (p.has_photo ? ' on' : ''), onclick: () => { pk.close(); fileInput.click(); } },
-            h('div', { class: 'pick-icon' }, '+'), h('span', null, p.has_photo ? 'New photo' : 'My photo'))),
-        h('div', { style: 'margin-top:16px' }, h('button', { class: 'link', onclick: () => choose(null) }, 'Use the simple placeholder instead')),
+        h('p', { class: 'muted' }, opts.length ? 'Pick the cleanest photo. The best match is first.' : 'No photos yet for this product.'),
+        grid, h('div', { style: 'display:flex;gap:10px;align-items:center;margin-top:14px;flex-wrap:wrap' }, more), status,
+        h('div', { style: 'margin-top:12px' }, h('button', { class: 'link', onclick: () => choose(null) }, 'Use the simple placeholder instead')),
       ],
     });
+    draw();
+    rank();
   }
 
   async function save(patch, msg) {

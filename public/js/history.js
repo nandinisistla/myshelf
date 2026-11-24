@@ -81,38 +81,43 @@ function main(start, end, reactions) {
     .filter((p) => (p.started || st.today) <= end && (!p.stopped || p.stopped >= start))
     .sort((a, b) => (a.started || '').localeCompare(b.started || '') || a.id - b.id);
 
-  const tickEls = ticks(start, end).filter((d) => x(d) < 94).flatMap((d) => [
-    h('div', { class: 'vline', style: `left:${x(d)}%` }),
-    h('div', { class: 'tick', style: `left:${x(d)}%` }, h('i'), h('div', { class: 'd' }, DD(d)), h('div', { class: 'm' }, MON(d))),
-  ]);
-
   const select = (id) => { selected = selected === id ? null : id; renderHistory(document.getElementById('view')); };
-  const badEls = reactions.flatMap((r) => [
-    h('div', { class: 'badday-line', style: `left:${x(r.date)}%` }),
-    h('button', { class: `badday sev${r.severity}` + (r.id === selected ? ' on' : ''), style: `left:${x(r.date)}%`,
-      title: `${fmtDate(r.date)} · ${AREAS[r.area]} · ${SEVERITY[r.severity]}`, 'aria-label': `Bad day ${fmtDate(r.date)}, ${AREAS[r.area]}`, onclick: () => select(r.id) }),
-  ]);
+  const tickDates = ticks(start, end).filter((d) => x(d) > 2 && x(d) < 96);
 
-  const band = win ? [
-    h('div', { class: 'window', style: `left:${x(win.from)}%;width:${Math.max(0.6, x(win.to) - x(win.from))}%` }),
-    h('div', { class: 'window-label', style: `left:${x(win.from)}%` }, `7 days before · ${AREAS[sel.area]}`),
-  ] : [];
+  // Header: dates and bad days on one axis
+  const axis = h('div', { class: 'g-axis' },
+    h('div', { class: 'g-lane' }),
+    h('div', { class: 'g-line' }),
+    tickDates.map((d) => h('div', { class: 'tick', style: `left:${x(d)}%` }, h('i'), h('div', { class: 'd' }, DD(d)), h('div', { class: 'm' }, MON(d)))),
+    reactions.map((r) => h('button', { class: `badday sev${r.severity}` + (r.id === selected ? ' on' : ''), style: `left:${x(r.date)}%`,
+      title: `${fmtDate(r.date)} · ${AREAS[r.area]} · ${SEVERITY[r.severity]}`, 'aria-label': `Bad day ${fmtDate(r.date)}, ${AREAS[r.area]}`, onclick: () => select(r.id) })));
+
+  // Guides drawn behind the rows
+  const overlay = h('div', { class: 'g-overlay', 'aria-hidden': 'true' },
+    tickDates.map((d) => h('div', { class: 'vline', style: `left:${x(d)}%` })),
+    reactions.map((r) => h('div', { class: 'badday-line', style: `left:${x(r.date)}%` })),
+    win ? h('div', { class: 'window', style: `left:${x(win.from)}%;width:${Math.max(0.6, x(win.to) - x(win.from))}%` }) : null);
 
   const rows = products.map((p) => {
     const s0 = p.started && p.started > start ? p.started : start;
     const e0 = p.stopped && p.stopped < end ? p.stopped : end;
     const left = x(s0), right = x(e0);
-    const ongoing = !p.stopped;
+    const width = right - left;
     const hasSus = (p.ingredients || []).some((i) => sus.has(i.family));
-    const shelf = S.routine(p.routine_id)?.name;
     const state = sel ? (inWin.has(p.id) ? ' hot' : ' dim') : '';
-    return h('div', { class: 'stage-row' + state },
-      h('div', { class: 'bar' + (ongoing ? ' open' : '') + (hasSus ? ' sus' : ''), style: `left:${left}%;width:${Math.max(0.8, right - left)}%` }),
-      h('div', { class: 'txt', style: `left:min(${left}%, calc(100% - 300px))` },
-        h('div', { class: 'mono' }, `${AREAS[p.area]} · ${short(p.started || st.today)} → ${p.stopped ? short(p.stopped) : 'now'} · ${howLong(p.started || st.today, p.stopped || st.today)}`,
-          sel && inWin.has(p.id) ? h('span', { class: 'inwin' }, ' · in window') : null),
-        h('button', { class: 'nm', onclick: () => openProduct(p) }, p.name),
-        h('div', { class: 'ds' }, [p.brand, shelf].filter(Boolean).join(' · '))));
+    const since = p.started === st.today ? 'Added today' : `${short(p.started || st.today)} → ${p.stopped ? short(p.stopped) : 'now'}`;
+    const dur = p.started === st.today ? '' : ` · ${howLong(p.started || st.today, p.stopped || st.today)}`;
+    const tagRight = left > 62;
+    return h('div', { class: 'g-row' + state },
+      h('div', { class: 'g-lab' },
+        h('div', { class: 'mono' }, [p.brand, AREAS[p.area]].filter(Boolean).join(' · ')),
+        h('button', { class: 'nm', onclick: () => openProduct(p), title: p.name }, p.name)),
+      h('div', { class: 'g-track' },
+        width < 1.2
+          ? h('span', { class: 'g-dot' + (hasSus ? ' sus' : ''), style: `left:${left}%` })
+          : h('div', { class: 'g-bar' + (p.stopped ? '' : ' open') + (hasSus ? ' sus' : ''), style: `left:${left}%;width:${width}%` }),
+        h('div', { class: 'g-tag mono' + (tagRight ? ' r' : ''), style: tagRight ? `right:${100 - left + 1.2}%` : `left:${left}%` },
+          since + dur, sel && inWin.has(p.id) ? h('span', { class: 'inwin' }, ' · in window') : null)));
   });
 
   return h('div', { class: 'sheet-main' },
@@ -120,10 +125,9 @@ function main(start, end, reactions) {
     h('h1', null, 'What you used, and when your skin reacted'),
     h('div', { class: 'thick' }),
     products.length || reactions.length
-      ? h('div', { class: 'chart-scroll' }, h('div', { class: 'chart' },
-          tickEls, band, badEls,
-          h('div', { class: 'axis' }, h('div', { class: 'line' })),
-          h('div', { class: 'stages' }, rows)))
+      ? h('div', { class: 'gantt' },
+          h('div', { class: 'g-head' }, h('div', { class: 'g-lab' }, h('div', { class: 'mono g-lane-l' }, 'Bad days'), h('div', { class: 'mono' }, 'Product')), axis),
+          h('div', { class: 'g-body' }, overlay, rows))
       : h('div', { class: 'empty' }, h('h3', null, 'Nothing here yet'), h('p', null, 'Add products to your shelf. The timeline draws itself from there.')),
     h('div', { class: 'sheet-foot-row mono' }, h('span', null, `Process · ${pad(products.length)} products`), h('span', null, `${short(start)} — ${short(end)}`)));
 }

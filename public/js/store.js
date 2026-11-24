@@ -42,6 +42,11 @@ export async function admin(action, key) {
   set(await call('/api/admin', { method: 'POST', body: JSON.stringify({ action, key, today: todayISO() }) }));
   return store.state;
 }
+export async function findPhotos(id) {
+  const r = await call('/api/photos', { method: 'POST', body: JSON.stringify({ id, today: todayISO() }) });
+  if (r.state) set(r.state);
+  return r.images || [];
+}
 export const searchProducts = (q) => call(`/api/lookup?q=${encodeURIComponent(q)}`);
 export const enrich = (body) => call('/api/enrich', { method: 'POST', body: JSON.stringify(body) });
 

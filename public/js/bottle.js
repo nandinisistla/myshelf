@@ -4,6 +4,7 @@
 // or drag/tap on the product page.
 import { h, s } from './ui.js';
 import { S } from './store.js';
+import { quoteFor } from './quotes.js';
 
 // ---------- colours ----------
 function hexToRgb(hex) {
@@ -95,7 +96,7 @@ export function cutout(src) {
     const img = new Image();
     img.onload = () => {
       try {
-        const scale = Math.min(1, 420 / Math.max(img.width, img.height));
+        const scale = Math.min(1, 1000 / Math.max(img.width, img.height));
         const w = Math.max(1, Math.round(img.width * scale));
         const hh = Math.max(1, Math.round(img.height * scale));
         const c = document.createElement('canvas');
@@ -170,30 +171,74 @@ export function imageSrc(p) {
 }
 
 function frontFace(p) {
-  const face = h('div', { class: 'face front' }, drawBottle(p));
   const src = imageSrc(p);
-  if (src) {
-    cutout(src).then((cut) => {
-      const img = h('img', { src: cut || src, alt: `${p.brand || ''} ${p.name}`.trim(), class: cut ? '' : 'blend', draggable: 'false' });
-      img.onerror = () => {}; // keep the drawing if the photo fails
-      img.onload = () => face.replaceChildren(img);
-    });
-  }
+  if (!src) return h('div', { class: 'face front' }, drawBottle(p));
+  const face = h('div', { class: 'face front loading' });
+  cutout(src).then((cut) => {
+    const img = h('img', { src: cut || src, alt: `${p.brand || ''} ${p.name}`.trim(), class: cut ? '' : 'blend', draggable: 'false' });
+    img.onload = () => { face.classList.remove('loading'); face.replaceChildren(img); };
+    img.onerror = () => { face.classList.remove('loading'); face.replaceChildren(drawBottle(p)); };
+  });
   return face;
 }
 
-export function labelCard(p, big = false) {
-  const sus = S.suspects();
-  const list = (p.ingredients || []).slice(0, big ? 14 : 8);
-  return h('div', { class: 'label-card' + (big ? ' big' : '') },
-    h('b', null, 'Ingredients'),
-    list.length ? list.map((i) => h('span', { class: sus.has(i.family) ? 'w' : '' }, i.plain || i.inci))
-      : h('span', null, 'No list yet'));
+// The back of every bottle: a short quote on beauty and confidence.
+export function quoteCard(p, big = false) {
+  const q = quoteFor(p.id);
+  return h('figure', { class: 'quote-card' + (big ? ' big' : '') },
+    h('div', { class: 'qc-top' }, h('span', null, 'A note'), h('span', null, '“')),
+    h('blockquote', null, q.q),
+    h('figcaption', null, h('b', null, q.by), h('span', null, q.src)));
+}
+
+// How good is a photo for the shelf? Plain light background, product filling
+// a sensible part of the frame, and enough resolution.
+const scoreCache = new Map();
+export function scoreImage(src) {
+  if (scoreCache.has(src)) return scoreCache.get(src);
+  const pr = new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      try {
+        const k = 120 / Math.max(img.width, img.height);
+        const w = Math.max(8, Math.round(img.width * k)), hh = Math.max(8, Math.round(img.height * k));
+        const c = document.createElement('canvas'); c.width = w; c.height = hh;
+        const ctx = c.getContext('2d', { willReadFrequently: true });
+        ctx.drawImage(img, 0, 0, w, hh);
+        const px = ctx.getImageData(0, 0, w, hh).data;
+        const border = [];
+        for (let x = 0; x < w; x++) border.push(x * 4, ((hh - 1) * w + x) * 4);
+        for (let y = 0; y < hh; y++) border.push(y * w * 4, (y * w + w - 1) * 4);
+        const avg = [0, 1, 2].map((ch) => border.reduce((a, i) => a + px[i + ch], 0) / border.length);
+        const spread = border.reduce((a, i) => a + Math.abs(px[i] - avg[0]) + Math.abs(px[i + 1] - avg[1]) + Math.abs(px[i + 2] - avg[2]), 0) / border.length;
+        let fg = 0;
+        for (let i = 0; i < px.length; i += 4) if (Math.abs(px[i] - avg[0]) + Math.abs(px[i + 1] - avg[1]) + Math.abs(px[i + 2] - avg[2]) > 40) fg++;
+        const ratio = fg / (w * hh);
+        const light = avg[0] + avg[1] + avg[2] > 690;
+        let score = 0;
+        score += light ? 40 : avg[0] + avg[1] + avg[2] > 600 ? 15 : 0;
+        score += spread < 12 ? 30 : spread < 30 ? 18 : spread < 60 ? 6 : -20;
+        score += ratio > 0.1 && ratio < 0.7 ? 20 : ratio > 0.05 && ratio < 0.85 ? 8 : -10;
+        score += Math.min(20, Math.max(img.width, img.height) / 60);
+        score += img.height >= img.width * 0.9 ? 6 : 0; // bottles are usually upright
+        resolve({ score, width: img.width, height: img.height });
+      } catch { resolve({ score: 0 }); }
+    };
+    img.onerror = () => resolve({ score: -999 });
+    img.src = src;
+  });
+  scoreCache.set(src, pr);
+  return pr;
+}
+
+export async function rankImages(options) {
+  const scored = await Promise.all(options.map(async (o) => ({ ...o, ...(await scoreImage(`/api/lookup?img=${encodeURIComponent(o.url)}`)) })));
+  return scored.filter((o) => o.score > -999).sort((a, b) => b.score - a.score);
 }
 
 // ---------- the interactive bottle ----------
 export function renderBottle(p, { big = false, onOpen, showName = true } = {}) {
-  const flip = h('div', { class: 'flip' }, frontFace(p), h('div', { class: 'face back' }, labelCard(p, big)));
+  const flip = h('div', { class: 'flip' }, frontFace(p), h('div', { class: 'face back' }, quoteCard(p, big)));
   const suspect = S.isSuspectProduct(p);
   const el = h('div', {
     class: 'bottle' + (big ? '' : ' can-hover') + (p.stopped ? ' stopped' : ''),

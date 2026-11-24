@@ -1,7 +1,7 @@
 // Add a product: type a name, pick the match, AI finds the ingredients, you check, done.
 import { h, put, s, toast, openSheet, AREAS, todayISO, compressImage } from './ui.js';
 import { store, mutate, searchProducts, enrich } from './store.js';
-import { renderBottle, cutout } from './bottle.js';
+import { renderBottle, cutout, rankImages } from './bottle.js';
 
 export function openAdd({ routineId = null, prefill = '' } = {}) {
   const sh = openSheet({ title: 'Add a product', body: [], foot: [], full: true });
@@ -130,6 +130,15 @@ export function openAdd({ routineId = null, prefill = '' } = {}) {
       tile(false, 'Take or upload my own photo', [h('div', { class: 'pick-icon' }, '+'), h('span', null, 'My photo')], () => fileIn.click()),
       fileIn);
     drawPicker();
+    // Put the cleanest, sharpest photo first and pick it, unless the user already chose.
+    let userPicked = false;
+    picker.addEventListener('click', () => { userPicked = true; }, true);
+    rankImages(options).then((ranked) => {
+      if (!ranked.length) return;
+      options.splice(0, options.length, ...ranked);
+      if (!userPicked && !draft.photo) { draft.image_url = options[0].url; drawPreview(); }
+      drawPicker();
+    });
 
     const name = h('input', { class: 'input', value: draft.name, oninput: (e) => { draft.name = e.target.value; } });
     const brand = h('input', { class: 'input', value: draft.brand || '', oninput: (e) => { draft.brand = e.target.value; } });
@@ -170,8 +179,9 @@ export function openAdd({ routineId = null, prefill = '' } = {}) {
     sh.setFoot(
       h('button', { class: 'btn block', onclick: () => stepSearch() }, 'Back'),
       h('button', { class: 'btn primary block', onclick: async (e) => {
+        const btn = e.currentTarget;
         if (!draft.name.trim()) { err.textContent = 'Add a name.'; return; }
-        e.currentTarget.disabled = true;
+        btn.disabled = true;
         try {
           const before = new Set(store.state.products.map((x) => x.id));
           await mutate('product.add', { ...draft, photo: undefined, ingredients: ings, image_credit: creditFor(draft.image_url), image_options: options });
@@ -182,7 +192,7 @@ export function openAdd({ routineId = null, prefill = '' } = {}) {
           sh.close();
           const shelfName = store.state.routines.find((r) => r.id === draft.routine_id)?.name;
           toast(`Added to ${shelfName || 'your shelf'}`);
-        } catch (ex) { err.textContent = ex.message; e.currentTarget.disabled = false; }
+        } catch (ex) { err.textContent = ex.message; btn.disabled = false; }
       } }, 'Add to shelf'));
   }
 
