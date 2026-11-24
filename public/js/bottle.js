@@ -182,13 +182,12 @@ function frontFace(p) {
   return face;
 }
 
-// The back of every bottle: a short quote on beauty and confidence.
+// The back of every bottle: a little note to make you smile.
 export function quoteCard(p, big = false) {
-  const q = quoteFor(p.id);
   return h('figure', { class: 'quote-card' + (big ? ' big' : '') },
-    h('div', { class: 'qc-top' }, h('span', null, 'A note'), h('span', null, '“')),
-    h('blockquote', null, q.q),
-    h('figcaption', null, h('b', null, q.by), h('span', null, q.src)));
+    h('div', { class: 'qc-top' }, h('span', null, 'A note for you'), h('i', { 'aria-hidden': 'true' })),
+    h('blockquote', { class: quoteFor(p.id).length > 30 ? 'long' : '' }, quoteFor(p.id)),
+    h('figcaption', null, h('span', null, 'MyShelf'), h('span', null, '♡')));
 }
 
 // How good is a photo for the shelf? Plain light background, product filling
