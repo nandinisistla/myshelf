@@ -175,9 +175,16 @@ export function cutout(src) {
           fg++;
           const x = p % w, y = (p / w) | 0;
           if (x < minX) minX = x; if (x > maxX) maxX = x; if (y < minY) minY = y; if (y > maxY) maxY = y;
-          // soften the edge
-          const nb = (x > 0 && seen[p - 1]) || (x < w - 1 && seen[p + 1]) || (y > 0 && seen[p - w]) || (y < hh - 1 && seen[p + w]);
-          if (nb) px[p * 4 + 3] = 150;
+          // soften the edge over two pixels, and drop the white fringe photos have there
+          const nb1 = (x > 0 && seen[p - 1]) || (x < w - 1 && seen[p + 1]) || (y > 0 && seen[p - w]) || (y < hh - 1 && seen[p + w]);
+          const nb2 = !nb1 && ((x > 1 && seen[p - 2]) || (x < w - 2 && seen[p + 2]) || (y > 1 && seen[p - 2 * w]) || (y < hh - 2 && seen[p + 2 * w]));
+          if (nb1 || nb2) {
+            const i4 = p * 4;
+            const m = Math.min(px[i4], px[i4 + 1], px[i4 + 2]);
+            const whiteness = light ? Math.max(0, (m - 200) / 55) : 0; // 0 = coloured, 1 = pure white
+            const base = nb1 ? 0.55 : 0.85;
+            px[i4 + 3] = Math.round(255 * base * (1 - whiteness * 0.6));
+          }
         }
         const ratio = fg / (w * hh);
         if (ratio < 0.04 || ratio > 0.985) return resolve(light ? whiteToAlpha(img, scale) : null);

@@ -184,7 +184,7 @@ export function openAdd({ routineId = null, prefill = '' } = {}) {
         btn.disabled = true;
         try {
           const before = new Set(store.state.products.map((x) => x.id));
-          await mutate('product.add', { ...draft, photo: undefined, ingredients: ings, image_credit: creditFor(draft.image_url), image_options: options });
+          await mutate('product.add', { ...draft, photo: undefined, ingredients: ings, image_credit: creditFor(draft.image_url), image_options: options, image_locked: userPicked });
           if (draft.photo) {
             const added = store.state.products.find((x) => !before.has(x.id));
             if (added) await mutate('product.photo', { id: added.id, data: draft.photo });

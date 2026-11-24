@@ -6,13 +6,13 @@ import { claude, textOf, extractJSON, webSources, useQuota, WEB_SEARCH_TOOL } fr
 import { findProductImages } from '../lib/images.js';
 import { rankProductImages } from '../lib/imgmeta.js';
 import { searchOBF } from '../lib/obf.js';
-import { getState, UserError } from '../lib/core.js';
+import { getState, UserError, logEvent } from '../lib/core.js';
 
 export const config = { maxDuration: 60 };
 
 export default handler(async (req, res) => {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Use POST' });
-  let { id, name, brand } = req.json;
+  let { id, name, brand, auto } = req.json;
   let product = null;
   if (id) {
     product = (await q(`select * from products where id = $1`, [Number(id)]))[0];
@@ -20,6 +20,12 @@ export default handler(async (req, res) => {
     name = product.name; brand = product.brand;
   }
   if (!name) throw new UserError('Which product?');
+  // Automatic upgrades: at most once a week per product, never over the user's own choice.
+  if (auto && product) {
+    const recent = product.photo_checked && Date.now() - new Date(product.photo_checked).getTime() < 7 * 86400000;
+    if (recent || product.image_locked || product.has_photo) return res.status(200).json({ images: product.image_options || [], skipped: true });
+    await q(`update products set photo_checked = now() where id = $1`, [product.id]);
+  }
   await useQuota('photos');
 
   let images = [];
@@ -46,11 +52,21 @@ Return ONLY JSON: {"pages": ["https://...", ...]} with 6 to 8 URLs.` }],
 
   if (product) {
     const seen = new Set();
-    const merged = [...images, ...(product.image_options || []).filter((o) => o.source !== 'Open Beauty Facts' || !images.length)].filter((o) => {
+    let merged = [...images, ...(product.image_options || [])].filter((o) => {
       const k = String(o.url).split('?')[0];
       if (seen.has(k)) return false; seen.add(k); return true;
-    }).slice(0, 10);
-    await q(`update products set image_options = $1::jsonb, updated_at = now() where id = $2`, [JSON.stringify(merged), product.id]);
+    });
+    if (process.env.MOCK_AI !== '1') merged = await rankProductImages(merged, brand).catch(() => merged);
+    merged = merged.slice(0, 10);
+    await q(`update products set image_options = $1::jsonb, photo_checked = now(), updated_at = now() where id = $2`, [JSON.stringify(merged), product.id]);
+    // Automatic mode: switch to the sharpest clean photo if it beats the current one.
+    const best = merged[0];
+    const current = merged.find((o) => o.url === product.image_url);
+    if (auto && best && best.url !== product.image_url && (!current || (best.score ?? 0) > (current.score ?? 0) + 5)) {
+      const credit = best.source === 'Open Beauty Facts' ? 'Photo: Open Beauty Facts (CC BY-SA)' : `Image: ${best.source}`;
+      await q(`update products set image_url = $1, image_credit = $2, updated_at = now() where id = $3`, [best.url, credit, product.id]);
+      await logEvent('product.photo', `Found a sharper photo of ${product.name}`, { productId: product.id }, 'app');
+    }
     return res.status(200).json({ images: merged, state: await getState(today(req)) });
   }
   res.status(200).json({ images });

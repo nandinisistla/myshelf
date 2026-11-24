@@ -141,7 +141,7 @@ export function openProduct(prod) {
     const choose = async (o) => {
       try {
         if (p.has_photo) await mutate('product.photo', { id: p.id, data: null });
-        await mutate('product.update', { id: p.id, patch: { image_url: o ? o.url : null, image_credit: o ? credit(o) : null } });
+        await mutate('product.update', { id: p.id, patch: { image_url: o ? o.url : null, image_credit: o ? credit(o) : null, image_locked: true } });
         pk.close(); toast('Picture updated');
       } catch (e) { toast(e.message); }
     };

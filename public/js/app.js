@@ -7,6 +7,8 @@ import { renderForMe } from './forme.js';
 import { renderChat, leaveChat } from './chat.js';
 import { openBadDay } from './reaction.js';
 import { openOnboarding, openSettings } from './settings.js';
+import { findPhotos } from './store.js';
+import { imageSrc, scoreImage } from './bottle.js';
 
 const view = document.getElementById('view');
 const frame = document.getElementById('frame');
@@ -46,6 +48,7 @@ async function start() {
   try {
     await load();
     if (!store.state.profile) openOnboarding();
+    upgradePhotos();
   } catch (e) {
     put(view, h('div', { class: 'empty' },
       h('h3', null, 'Couldn’t open your shelf'),
@@ -54,3 +57,22 @@ async function start() {
   }
 }
 start();
+
+// Always look for a sharper photo: in the background, products whose photo is small
+// (or missing) get a fresh search. Never touches photos you chose or took yourself.
+async function upgradePhotos() {
+  if (!store.state?.aiEnabled) return;
+  const week = 7 * 86400000;
+  const todo = [];
+  for (const p of store.state.products) {
+    if (p.has_photo || p.image_locked || p.stopped) continue;
+    if (p.photo_checked && Date.now() - new Date(p.photo_checked).getTime() < week) continue;
+    const src = imageSrc(p);
+    if (!src) { todo.push(p.id); continue; }
+    const r = await scoreImage(src);
+    if (!r.width || Math.min(r.width, r.height) < 900) todo.push(p.id);
+  }
+  for (const id of todo.slice(0, 3)) {
+    try { await findPhotos(id, true); } catch { /* try again another day */ }
+  }
+}
