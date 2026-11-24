@@ -13,11 +13,10 @@ export default handler(async (req, res) => {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Use POST' });
   const { action, key } = req.json;
   const isDemo = String(action || '').startsWith('demo.');
-  // Demo data can be added without a passcode when no OWNER_KEY is set; backups always need one.
   if (!process.env.OWNER_KEY && !isDemo) throw new UserError('Owner tools are off. Set OWNER_KEY in Vercel to turn them on.');
-  if (process.env.OWNER_KEY && key !== process.env.OWNER_KEY) throw new UserError('Wrong passcode.');
-
+  // Demo data is harmless (marked, removable in one click), so it never needs the passcode.
   if (isDemo) return res.status(200).json(await demo(action, req.json, today(req)));
+  if (key !== process.env.OWNER_KEY) throw new UserError('Wrong passcode.');
 
   if (action === 'save') {
     const data = {};

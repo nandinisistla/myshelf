@@ -5,6 +5,7 @@ import { renderBottle } from './bottle.js';
 import { openProduct } from './product.js';
 import { openAdd } from './add.js';
 import { getHero } from './hero.js';
+import { loadDemo, demoState, onDemoProgress } from './demo.js';
 
 const pad = (n) => String(n).padStart(2, '0');
 
@@ -22,7 +23,8 @@ export function renderShelf(view) {
       : 'Add your first product. Type its name and MyShelf finds the photo and the full ingredient list.'),
     h('div', { style: 'display:flex;gap:10px;margin-top:22px;flex-wrap:wrap' },
       h('button', { class: 'btn primary', onclick: () => openAdd() }, 'Add a product'),
-      h('button', { class: 'btn', onclick: newShelf }, 'New shelf')));
+      h('button', { class: 'btn', onclick: newShelf }, 'New shelf'),
+      demoButton(st)));
 
   const groups = st.routines.map((r, i) => group(r, i + 1, onShelf.filter((p) => p.routine_id === r.id), numberOf));
   const unsorted = onShelf.filter((p) => !p.routine_id || !st.routines.some((r) => r.id === p.routine_id));
@@ -116,3 +118,22 @@ async function removeShelf(r) {
   if (!(await confirmSheet(`Remove the "${r.name}" shelf? Its products move to Unsorted. Nothing is deleted.`, 'Remove shelf'))) return;
   try { await mutate('routine.delete', { id: r.id }); toast('Shelf removed'); } catch (e) { toast(e.message); }
 }
+
+// One click to fill an empty MyShelf with five months of example history (for demos).
+function demoButton(st) {
+  const hasHistory = st.reactions.length || st.products.some((p) => p.demo);
+  if (hasHistory && !demoState.running) return null;
+  return h('button', {
+    class: 'btn', 'data-demo-btn': '', disabled: demoState.running ? '' : null,
+    title: 'Adds example products and bad days from the last five months. Remove them any time in Settings.',
+    onclick: () => loadDemo('', (msg) => toast(msg)).catch((e) => toast(e.message)),
+  }, demoState.running ? demoState.msg : 'Load demo history');
+}
+onDemoProgress(() => {
+  const b = document.querySelector('[data-demo-btn]');
+  if (!b) return;
+  const st = store.state;
+  const done = !demoState.running && (st.reactions.length || st.products.some((p) => p.demo));
+  if (done) b.remove();
+  else { b.textContent = demoState.running ? demoState.msg : 'Load demo history'; b.disabled = demoState.running; }
+});

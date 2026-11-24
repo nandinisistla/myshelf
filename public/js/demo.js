@@ -3,9 +3,15 @@
 import { admin, enrich } from './store.js';
 
 let running = null;
+export const demoState = { running: false, msg: '' };
+let rerender = () => {};
+export const onDemoProgress = (fn) => { rerender = fn; };
 
 export function loadDemo(key, onProgress = () => {}) {
   if (running) return running;
+  const report = onProgress;
+  onProgress = (msg, n, total) => { demoState.msg = total ? `Adding demo · ${n} of ${total}` : msg; report(msg, n, total); rerender(); };
+  demoState.running = true; demoState.msg = 'Starting demo…'; rerender();
   running = (async () => {
     const plan = await admin('demo.plan', key);
     const todo = plan.demoTodo || [];
@@ -27,7 +33,7 @@ export function loadDemo(key, onProgress = () => {}) {
     await Promise.all([worker(), worker(), worker()]);
     await admin('demo.finish', key);
     onProgress('Demo history is ready', todo.length, todo.length);
-  })().finally(() => { running = null; });
+  })().finally(() => { running = null; demoState.running = false; rerender(); });
   return running;
 }
 
