@@ -1,0 +1,14 @@
+{
+  "name": "myshelf",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "MyShelf: a personal skincare shelf that connects the dots between your products, ingredients and bad-skin days.",
+  "scripts": {
+    "dev": "node dev/server.mjs"
+  },
+  "engines": { "node": ">=20" },
+  "dependencies": {
+    "@neondatabase/serverless": "^1.2.1"
+  }
+}
