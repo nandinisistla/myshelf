@@ -60,6 +60,21 @@ svg { display: block; }
   .bd-text { display: none; }
 }
 
+/* ---------- hero ---------- */
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.hero { position: relative; width: 100vw; margin-left: calc(50% - 50vw); height: calc(100dvh - var(--nav)); min-height: 440px; border-bottom: 1px solid var(--hair); }
+.hero-canvas { position: absolute; inset: 0; width: 100%; height: 100%; touch-action: pan-y; }
+.hero-corner { position: absolute; top: 22px; z-index: 1; pointer-events: none; }
+.hero-corner.l { left: clamp(18px, 4vw, 48px); }
+.hero-corner.r { right: clamp(18px, 4vw, 48px); }
+.scroll-cue { position: absolute; left: 50%; bottom: 26px; transform: translateX(-50%); background: none; border: 0; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 10px;
+  font-family: var(--mono); font-size: 11px; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); }
+.scroll-cue:hover { color: var(--ink); }
+.scroll-cue i { position: relative; width: 1px; height: 46px; background: var(--hair); overflow: hidden; }
+.scroll-cue b { position: absolute; left: -2px; top: -8px; width: 5px; height: 5px; border-radius: 50%; background: var(--ink); animation: drop 1.8s cubic-bezier(.6,0,.4,1) infinite; }
+@keyframes drop { 0% { top: -8px; } 70%, 100% { top: 50px; } }
+#shelf-start { scroll-margin-top: var(--nav); }
+
 /* ---------- type ---------- */
 .page-head { padding: 56px 0 28px; }
 .eyebrow { display: flex; align-items: center; gap: 14px; }

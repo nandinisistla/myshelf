@@ -4,6 +4,7 @@ import { store, mutate, S } from './store.js';
 import { renderBottle } from './bottle.js';
 import { openProduct } from './product.js';
 import { openAdd } from './add.js';
+import { getHero } from './hero.js';
 
 const pad = (n) => String(n).padStart(2, '0');
 
@@ -13,7 +14,7 @@ export function renderShelf(view) {
   const onShelf = st.products.filter((p) => !p.stopped);
   const past = st.products.filter((p) => p.stopped).sort((a, b) => (b.stopped || '').localeCompare(a.stopped || ''));
 
-  const head = h('section', { class: 'page-head' },
+  const head = h('section', { class: 'page-head', id: 'shelf-start' },
     h('div', { class: 'eyebrow mono' }, `Shelf · ${pad(onShelf.length)} product${onShelf.length === 1 ? '' : 's'} in use`),
     h('h1', { class: 'display' }, 'Your shelf', h('span', { class: 'soft' }, '.')),
     h('p', { class: 'lede' }, onShelf.length
@@ -31,7 +32,7 @@ export function renderShelf(view) {
     h('summary', { class: 'mono', style: 'cursor:pointer;list-style:none' }, `No longer using · ${pad(past.length)}  ↓`),
     h('div', { class: 'grid', style: 'margin-top:18px' }, past.map((p) => card(p, numberOf)))) : null;
 
-  put(view, head, groups, pastBlock);
+  put(view, getHero(), head, groups, pastBlock);
 }
 
 function group(r, n, products, numberOf) {
