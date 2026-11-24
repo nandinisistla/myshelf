@@ -174,11 +174,17 @@ textarea.input { resize: vertical; min-height: 84px; }
 .bottle.dragging .flip { transition: none; }
 .bottle .face { position: absolute; inset: 0; backface-visibility: hidden; -webkit-backface-visibility: hidden; display: flex; align-items: flex-end; justify-content: center; }
 .bottle .face.back { transform: rotateY(180deg); align-items: center; }
+/* Show exactly one side: the product disappears the moment the card passes edge-on. */
+.bottle .face { transition: visibility 0s linear .13s; }
+.bottle.dragging .face { transition: none; }
+.bottle .face.back { visibility: hidden; }
+.bottle.back-side .face.front { visibility: hidden; }
+.bottle.back-side .face.back { visibility: visible; }
 .bottle .face img, .bottle .face svg { max-width: 100%; max-height: 100%; object-fit: contain; }
 .bottle .face img.boxed { border-radius: 10px; background: var(--white); }
 .bottle .face img.blend { mix-blend-mode: multiply; filter: contrast(1.04) !important; border-radius: 0; }
 .tile .bottle .face img.blend, .p-tile .bottle .face img.blend { max-height: 104%; }
-@media (hover: hover) and (pointer: fine) { .tile:hover .flip { transform: rotateY(180deg); } }
+@media (hover: hover) and (pointer: fine) { .tile:hover .flip { transform: rotateY(180deg); } .tile:hover .face.front { visibility: hidden; } .tile:hover .face.back { visibility: visible; } }
 .bottle .bname, .bottle .sdot { display: none; }
 .quote-card { margin: 0; width: 100%; max-width: 200px; aspect-ratio: 3 / 4; max-height: 94%; border-radius: 12px; background: var(--white); border: 1px solid var(--hair-2);
   padding: 16px; display: flex; flex-direction: column; text-align: left; box-shadow: 0 16px 26px -18px rgba(0,0,0,.4); }

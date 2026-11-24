@@ -162,29 +162,51 @@ export function cutout(src) {
           if (x > 0) push(p - 1); if (x < w - 1) push(p + 1);
           if (y > 0) push(p - w); if (y < hh - 1) push(p + w);
         }
-        // A product is one solid object: everything between its left and right edge
-        // on each row belongs to it. This keeps shiny white highlights from turning into holes.
+        // A product is one solid object: everything between its edges on each row and
+        // each column belongs to it. This keeps shiny white highlights and white caps whole.
         for (let y = 0; y < hh; y++) {
           let l = -1, r = -1;
           for (let x = 0; x < w; x++) if (!seen[y * w + x]) { if (l < 0) l = x; r = x; }
           if (l >= 0) for (let x = l; x <= r; x++) seen[y * w + x] = 0;
         }
+        for (let x = 0; x < w; x++) {
+          let t = -1, btm = -1;
+          for (let y = 0; y < hh; y++) if (!seen[y * w + x]) { if (t < 0) t = y; btm = y; }
+          if (t >= 0) for (let y = t; y <= btm; y++) seen[y * w + x] = 0;
+        }
+        // Smooth outline: blur the mask a little and use it as a soft alpha, so the edge is
+        // a clean curve instead of the pixel-by-pixel staircase of the photo's background.
+        let m = new Float32Array(w * hh);
+        for (let p = 0; p < w * hh; p++) m[p] = seen[p] ? 0 : 1;
+        const r = Math.max(1, Math.round(Math.max(w, hh) / 500));
+        const tmp = new Float32Array(w * hh);
+        for (let pass = 0; pass < 2; pass++) {
+          for (let y = 0; y < hh; y++) {           // horizontal
+            let acc = 0; const row = y * w;
+            for (let x = -r; x <= r; x++) acc += m[row + Math.min(w - 1, Math.max(0, x))];
+            for (let x = 0; x < w; x++) {
+              tmp[row + x] = acc / (2 * r + 1);
+              acc += m[row + Math.min(w - 1, x + r + 1)] - m[row + Math.max(0, x - r)];
+            }
+          }
+          for (let x = 0; x < w; x++) {            // vertical
+            let acc = 0;
+            for (let y = -r; y <= r; y++) acc += tmp[Math.min(hh - 1, Math.max(0, y)) * w + x];
+            for (let y = 0; y < hh; y++) {
+              m[y * w + x] = acc / (2 * r + 1);
+              acc += tmp[Math.min(hh - 1, y + r + 1) * w + x] - tmp[Math.max(0, y - r) * w + x];
+            }
+          }
+        }
         let minX = w, minY = hh, maxX = 0, maxY = 0, fg = 0;
         for (let p = 0; p < w * hh; p++) {
-          if (seen[p]) { px[p * 4 + 3] = 0; continue; }
-          fg++;
+          let a = (m[p] - 0.3) / 0.4;              // soft, centred on the original edge
+          a = a <= 0 ? 0 : a >= 1 ? 1 : a * a * (3 - 2 * a);
+          px[p * 4 + 3] = Math.round(a * 255);
+          if (a === 0) continue;
+          if (!seen[p]) fg++;
           const x = p % w, y = (p / w) | 0;
           if (x < minX) minX = x; if (x > maxX) maxX = x; if (y < minY) minY = y; if (y > maxY) maxY = y;
-          // soften the edge over two pixels, and drop the white fringe photos have there
-          const nb1 = (x > 0 && seen[p - 1]) || (x < w - 1 && seen[p + 1]) || (y > 0 && seen[p - w]) || (y < hh - 1 && seen[p + w]);
-          const nb2 = !nb1 && ((x > 1 && seen[p - 2]) || (x < w - 2 && seen[p + 2]) || (y > 1 && seen[p - 2 * w]) || (y < hh - 2 && seen[p + 2 * w]));
-          if (nb1 || nb2) {
-            const i4 = p * 4;
-            const m = Math.min(px[i4], px[i4 + 1], px[i4 + 2]);
-            const whiteness = light ? Math.max(0, (m - 200) / 55) : 0; // 0 = coloured, 1 = pure white
-            const base = nb1 ? 0.55 : 0.85;
-            px[i4 + 3] = Math.round(255 * base * (1 - whiteness * 0.6));
-          }
         }
         const ratio = fg / (w * hh);
         if (ratio < 0.04 || ratio > 0.985) return resolve(light ? whiteToAlpha(img, scale) : null);
@@ -295,7 +317,12 @@ export function renderBottle(p, { big = false, onOpen, showName = true } = {}) {
     showName ? h('div', { class: 'bname' }, p.name) : null);
 
   let angle = 0, startX = 0, down = false, moved = false, holdTimer = null, held = false, lastDx = 0;
-  const setAngle = (a, animate = true) => { el.classList.toggle('dragging', !animate); flip.style.transform = `rotateY(${a}deg)`; };
+  const setAngle = (a, animate = true) => {
+    el.classList.toggle('dragging', !animate);
+    const n = ((a % 360) + 360) % 360;
+    el.classList.toggle('back-side', n > 90 && n < 270);   // only one side is ever drawn
+    flip.style.transform = `rotateY(${a}deg)`;
+  };
 
   el.addEventListener('pointerdown', (e) => {
     down = true; moved = false; held = false; startX = e.clientX; lastDx = 0;
