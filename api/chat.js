@@ -7,6 +7,7 @@ import * as core from '../lib/core.js';
 import { claude, textOf, useQuota } from '../lib/ai.js';
 import { enrichProduct } from '../lib/enrich.js';
 import { searchOBF, OBF_CREDIT } from '../lib/obf.js';
+import { rankProductImages } from '../lib/imgmeta.js';
 import { AREAS } from '../lib/families.js';
 
 export const config = { maxDuration: 60 };
@@ -90,10 +91,11 @@ async function runTool(name, input, ctx) {
         ingredientsText: input.ingredients_text || obf?.ingredientsText || '',
         profile: ctx.state.profile, useWeb: !input.ingredients_text,
       });
-      const options = [
+      let options = [
         ...(info.images || []),
         ...(obf?.image ? [{ url: obf.image, source: 'Open Beauty Facts' }] : []),
       ];
+      if (process.env.MOCK_AI !== '1') options = await rankProductImages(options, info.brand).catch(() => options);
       const first = options[0];
       const p = await core.addProduct({
         ...info, routine: input.routine, started: input.started, today: t,

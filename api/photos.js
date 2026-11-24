@@ -4,6 +4,7 @@ import { handler, today } from '../lib/http.js';
 import { q } from '../lib/db.js';
 import { claude, textOf, extractJSON, webSources, useQuota, WEB_SEARCH_TOOL } from '../lib/ai.js';
 import { findProductImages } from '../lib/images.js';
+import { rankProductImages } from '../lib/imgmeta.js';
 import { searchOBF } from '../lib/obf.js';
 import { getState, UserError } from '../lib/core.js';
 
@@ -40,10 +41,11 @@ Return ONLY JSON: {"pages": ["https://...", "https://..."]} with up to 5 product
   }
   const obf = (await searchOBF(`${brand || ''} ${name}`.trim(), 2))[0];
   if (obf?.image) images.push({ url: obf.image, source: 'Open Beauty Facts' });
+  if (process.env.MOCK_AI !== '1') images = await rankProductImages(images, brand).catch(() => images);
 
   if (product) {
     const seen = new Set();
-    const merged = [...images, ...(product.image_options || [])].filter((o) => {
+    const merged = [...images, ...(product.image_options || []).filter((o) => o.source !== 'Open Beauty Facts' || !images.length)].filter((o) => {
       const k = String(o.url).split('?')[0];
       if (seen.has(k)) return false; seen.add(k); return true;
     }).slice(0, 10);

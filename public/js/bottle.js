@@ -90,6 +90,37 @@ export function drawBottle(p) {
 
 // ---------- background cut-out for photos ----------
 const cutCache = new Map();
+// Turn a photo on white into a transparent image where white disappears and every
+// colour keeps its exact look when shown over white (like printing on the tile).
+function whiteToAlpha(img, scale) {
+  const w = Math.max(1, Math.round(img.width * scale));
+  const hh = Math.max(1, Math.round(img.height * scale));
+  const c = document.createElement('canvas');
+  c.width = w; c.height = hh;
+  const ctx = c.getContext('2d', { willReadFrequently: true });
+  ctx.drawImage(img, 0, 0, w, hh);
+  const d = ctx.getImageData(0, 0, w, hh);
+  const px = d.data;
+  let minX = w, minY = hh, maxX = 0, maxY = 0;
+  for (let p = 0, i = 0; i < px.length; i += 4, p++) {
+    const m = Math.min(px[i], px[i + 1], px[i + 2]);
+    let a = 1 - m / 255;
+    a = a < 0.02 ? 0 : Math.min(1, a * 1.15);
+    if (a === 0) { px[i + 3] = 0; continue; }
+    for (let k = 0; k < 3; k++) px[i + k] = Math.max(0, Math.min(255, Math.round((px[i + k] - 255 * (1 - a)) / a)));
+    px[i + 3] = Math.round(a * 255);
+    const x = p % w, y = (p / w) | 0;
+    if (x < minX) minX = x; if (x > maxX) maxX = x; if (y < minY) minY = y; if (y > maxY) maxY = y;
+  }
+  if (maxX <= minX || maxY <= minY) return null;
+  ctx.putImageData(d, 0, 0);
+  const pad = 4;
+  const out = document.createElement('canvas');
+  out.width = Math.min(w, maxX - minX + 1 + pad * 2); out.height = Math.min(hh, maxY - minY + 1 + pad * 2);
+  out.getContext('2d').drawImage(c, Math.max(0, minX - pad), Math.max(0, minY - pad), out.width, out.height, 0, 0, out.width, out.height);
+  return out.toDataURL('image/png');
+}
+
 export function cutout(src) {
   if (cutCache.has(src)) return cutCache.get(src);
   const pr = new Promise((resolve) => {
@@ -115,7 +146,7 @@ export function cutout(src) {
         const spread = border.reduce((m, i) => Math.max(m, Math.abs(px[i] - bg[0]) + Math.abs(px[i + 1] - bg[1]) + Math.abs(px[i + 2] - bg[2])), 0);
         const light = bg[0] + bg[1] + bg[2] > 690;
         if (!light && spread > 60) return resolve(null);   // busy background: don't guess
-        const tol = light ? 16 : 26;                        // tight, so white bottles stay intact
+        const tol = light ? 10 : 26;                        // tight, so white bottles keep their edges
         const isBg = (i) => {
           const dr = px[i] - bg[0], dg = px[i + 1] - bg[1], db = px[i + 2] - bg[2];
           return dr * dr + dg * dg + db * db < tol * tol;
@@ -149,7 +180,15 @@ export function cutout(src) {
           if (nb) px[p * 4 + 3] = 150;
         }
         const ratio = fg / (w * hh);
-        if (ratio < 0.04 || ratio > 0.985) return resolve(null);
+        if (ratio < 0.04 || ratio > 0.985) return resolve(light ? whiteToAlpha(img, scale) : null);
+        // Only trust the cut-out if it still looks like a whole product. White products on
+        // white backgrounds can get eaten away; those are blended onto the tile instead.
+        const bw = (maxX - minX + 1) / w, bh = (maxY - minY + 1) / hh;
+        if (bw < 0.2 || bh < 0.3 || ratio < 0.08) {
+          // Fall back to "white becomes see-through": the photo sits on the grey tile
+          // like a print, with nothing cut away.
+          return resolve(light ? whiteToAlpha(img, scale) : null);
+        }
         ctx.putImageData(data, 0, 0);
         const out = document.createElement('canvas');
         out.width = maxX - minX + 1; out.height = maxY - minY + 1;

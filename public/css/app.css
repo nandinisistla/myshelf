@@ -176,7 +176,8 @@ textarea.input { resize: vertical; min-height: 84px; }
 .bottle .face.back { transform: rotateY(180deg); align-items: center; }
 .bottle .face img, .bottle .face svg { max-width: 100%; max-height: 100%; object-fit: contain; }
 .bottle .face img.boxed { border-radius: 10px; background: var(--white); }
-.bottle .face img.blend { mix-blend-mode: multiply; filter: none !important; border-radius: 6px; }
+.bottle .face img.blend { mix-blend-mode: multiply; filter: contrast(1.04) !important; border-radius: 0; }
+.tile .bottle .face img.blend, .p-tile .bottle .face img.blend { max-height: 104%; }
 @media (hover: hover) and (pointer: fine) { .tile:hover .flip { transform: rotateY(180deg); } }
 .bottle .bname, .bottle .sdot { display: none; }
 .quote-card { margin: 0; width: 100%; max-width: 200px; aspect-ratio: 3 / 4; max-height: 94%; border-radius: 12px; background: var(--white); border: 1px solid var(--hair-2);
