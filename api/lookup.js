@@ -4,7 +4,7 @@
 import { handler } from '../lib/http.js';
 import { q } from '../lib/db.js';
 import { searchOBF, OBF_UA } from '../lib/obf.js';
-import { isSafeUrl } from '../lib/images.js';
+import { isSafeUrl, bigger } from '../lib/images.js';
 
 const MAX_BYTES = 6 * 1024 * 1024;
 
@@ -28,10 +28,16 @@ export default handler(async (req, res) => {
       res.setHeader('Content-Type', 'image/svg+xml');
       return res.status(200).send(mockBottleSvg(img));
     }
-    const ctrl = new AbortController();
-    const timer = setTimeout(() => ctrl.abort(), 8000);
-    const r = await fetch(img, { headers: { 'User-Agent': OBF_UA, Accept: 'image/*' }, signal: ctrl.signal, redirect: 'follow' }).catch(() => null);
-    clearTimeout(timer);
+    const get = async (u) => {
+      const ctrl = new AbortController();
+      const timer = setTimeout(() => ctrl.abort(), 8000);
+      const r = await fetch(u, { headers: { 'User-Agent': OBF_UA, Accept: 'image/*' }, signal: ctrl.signal, redirect: 'follow' }).catch(() => null);
+      clearTimeout(timer);
+      return r && r.ok && /^image\//.test(r.headers.get('content-type') || '') ? r : null;
+    };
+    // Always try the large version of the photo first.
+    const big = bigger(img);
+    const r = (big !== img && await get(big)) || await get(img);
     const type = r?.headers.get('content-type') || '';
     if (!r || !r.ok || !/^image\/(jpeg|png|webp|gif|avif)/.test(type)) return res.status(404).json({ error: 'Image not found' });
     const buf = Buffer.from(await r.arrayBuffer());

@@ -30,10 +30,11 @@ export default handler(async (req, res) => {
     const resp = await claude({
       max_tokens: 800,
       system: 'You find official product pages. Answer with JSON only.',
-      tools: [{ type: WEB_SEARCH_TOOL(), name: 'web_search', max_uses: 2 }],
-      messages: [{ role: 'user', content: `Find web pages that show a clean product photo (packshot on a plain background) of exactly this product: ${brand ? brand + ' ' : ''}${name}.
-Prefer the brand's official online store, then big retailers (Sephora, Ulta, YesStyle, Olive Young, Boots, Target).
-Return ONLY JSON: {"pages": ["https://...", "https://..."]} with up to 5 product page URLs (not search or category pages).` }],
+      tools: [{ type: WEB_SEARCH_TOOL(), name: 'web_search', max_uses: 3 }],
+      messages: [{ role: 'user', content: `Find web pages that show a large, clean product photo (packshot on a plain white background, current packaging) of exactly this product: ${brand ? brand + ' ' : ''}${name}.
+Look in this order: 1) the brand's official online store, 2) online shops that sell it (many K-beauty and beauty shops run on Shopify), 3) Olive Young Global, YesStyle, Stylevana, Ulta, Sephora, Boots, Cult Beauty.
+Only product pages for this exact product and size (not search, category or blog pages).
+Return ONLY JSON: {"pages": ["https://...", ...]} with 6 to 8 URLs.` }],
     });
     const data = extractJSON(textOf(resp)) || {};
     const pages = [...(Array.isArray(data.pages) ? data.pages : []), ...webSources(resp).map((s) => s.url)];

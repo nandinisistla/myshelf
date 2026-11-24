@@ -1,7 +1,7 @@
 // Product page: the bottle, when you used it, and every ingredient in plain words.
 import { h, put, toast, confirmSheet, openSheet, fmtDate, howLong, AREAS, compressImage } from './ui.js';
 import { store, mutate, S, onChange, findPhotos } from './store.js';
-import { renderBottle, rankImages } from './bottle.js';
+import { renderBottle, rankImages, imageSrc, scoreImage } from './bottle.js';
 
 export function openProduct(prod) {
   let mode = 'plain';
@@ -67,6 +67,17 @@ export function openProduct(prod) {
               sus.has(i.family) ? h('span', { class: 'pill amber', style: 'margin-left:6px' }, 'possible trigger') : null))))
       : h('p', { class: 'label-view' }, list.map((i, n) => [h('span', { class: sus.has(i.family) ? 'w' : '' }, i.inci), n < list.length - 1 ? ', ' : '']));
 
+    // Warn when the photo is too small to look sharp.
+    const lowRes = h('div');
+    const src = imageSrc(p);
+    if (src && !p.has_photo) scoreImage(src).then((r) => {
+      if (r.width && Math.min(r.width, r.height) < 600) {
+        lowRes.replaceChildren(h('div', { class: 'callout', style: 'display:flex;justify-content:space-between;align-items:center;gap:10px' },
+          h('span', null, 'This photo is small, so it may look blurry.'),
+          h('button', { class: 'btn small', onclick: () => pickPicture(p, fileInput) }, 'Find a sharper one')));
+      }
+    });
+
     return [
       h('div', { class: 'p-hero' },
         h('div', { class: 'p-tile' }, h('span', { class: 'floor', 'aria-hidden': 'true' }), renderBottle(p, { big: true, showName: false })),
@@ -76,6 +87,7 @@ export function openProduct(prod) {
         h('div', { class: 'p-status' }, status,
           fine ? h('span', { class: 'pill ok' }, 'Seems fine for you') : null,
           susFamilies.length ? h('span', { class: 'pill amber' }, 'Has a possible trigger') : null)),
+      lowRes,
       controls,
       h('div', { class: 'easier' }, h('h3', null, "Let's make it easier"),
         h('div', { class: 'seg', role: 'tablist' },
