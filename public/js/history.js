@@ -5,8 +5,8 @@ import { store, S } from './store.js';
 import { openProduct } from './product.js';
 import { openBadDay } from './reaction.js';
 
-let range = 90;
-let selected = null;
+let range = 0;   // all time by default
+let selected;   // undefined = not chosen yet: start with the latest bad day
 const pad = (n) => String(n).padStart(2, '0');
 const MON = (iso) => new Date(iso + 'T12:00:00Z').toLocaleDateString('en-US', { month: 'short', timeZone: 'UTC' }).toUpperCase();
 const DD = (iso) => iso.slice(8, 10);
@@ -14,15 +14,15 @@ const short = (iso) => `${DD(iso)} ${MON(iso)}`;
 
 export function renderHistory(view) {
   const st = store.state;
-  if (selected && !st.reactions.some((r) => r.id === selected)) selected = null;
+  if (selected && !st.reactions.some((r) => r.id === selected)) selected = undefined;
   const [start, end] = bounds();
   const inRange = st.reactions.filter((r) => r.date >= start && r.date <= end);
+  if (selected === undefined) selected = inRange[0]?.id ?? null;   // reactions come newest first
 
   put(view,
     h('div', { class: 'sheet-label mono' }, 'History · Section A–A'),
     h('section', { class: 'drawing' }, rail(inRange.length), main(start, end, inRange)),
-    h('div', { class: 'under mono' }, h('span', null, `Timeline · ${range ? range + '-day' : 'full'} chart`), h('span', null, 'Tap an amber dot to see the 7 days before')),
-    selectedCard(),
+    h('div', { class: 'under mono' }, h('span', null, `Timeline · ${range ? range + '-day' : 'full'} chart`), h('span', null, 'Click any amber dot to see what you used the week before')),
     h('div', { class: 'sheet-label mono' }, 'Log · Everything that happened'),
     log());
 }
@@ -95,8 +95,11 @@ function main(start, end, reactions) {
   // Guides drawn behind the rows
   const overlay = h('div', { class: 'g-overlay', 'aria-hidden': 'true' },
     tickDates.map((d) => h('div', { class: 'vline', style: `left:${x(d)}%` })),
-    reactions.map((r) => h('div', { class: 'badday-line', style: `left:${x(r.date)}%` })),
-    win ? h('div', { class: 'window', style: `left:${x(win.from)}%;width:${Math.max(0.6, x(win.to) - x(win.from))}%` }) : null);
+    reactions.map((r) => {
+      const from = addDays(r.date, -7);
+      return h('div', { class: 'window' + (r.id === selected ? ' on' : ''), style: `left:${x(from)}%;width:${Math.max(0.6, x(r.date) - x(from))}%` });
+    }),
+    reactions.map((r) => h('div', { class: 'badday-line', style: `left:${x(r.date)}%` })));
 
   const rows = products.map((p) => {
     const s0 = p.started && p.started > start ? p.started : start;
@@ -124,12 +127,27 @@ function main(start, end, reactions) {
     h('div', { class: 'eyebrow mono' }, 'Section A–A'),
     h('h1', null, 'What you used, and when your skin reacted'),
     h('div', { class: 'thick' }),
+    legend(),
+    selectedCard(),
     products.length || reactions.length
       ? h('div', { class: 'gantt' },
           h('div', { class: 'g-head' }, h('div', { class: 'g-lab' }, h('div', { class: 'mono g-lane-l' }, 'Bad days'), h('div', { class: 'mono' }, 'Product')), axis),
           h('div', { class: 'g-body' }, overlay, rows))
       : h('div', { class: 'empty' }, h('h3', null, 'Nothing here yet'), h('p', null, 'Add products to your shelf. The timeline draws itself from there.')),
     h('div', { class: 'sheet-foot-row mono' }, h('span', null, `Process · ${pad(products.length)} products`), h('span', null, `${short(start)} — ${short(end)}`)));
+}
+
+// A plain key, so the drawing explains itself.
+function legend() {
+  const item = (mark, text) => h('div', { class: 'lg-item' }, h('span', { class: 'lg-mark ' + mark, 'aria-hidden': 'true' }), h('span', null, text));
+  return h('div', { class: 'legend-wrap' },
+    h('p', { class: 'how' }, 'For each bad day, MyShelf looks at what you used on that same area in the week before. Ingredients that keep turning up in those weeks become suspects.'),
+    h('div', { class: 'legend' },
+      item('dot', 'Bad day (bigger = worse)'),
+      item('band', 'The week before a bad day'),
+      item('bar', 'Product: started → stopped'),
+      item('bar open', 'Still using it'),
+      item('bar sus', 'Has a likely trigger')));
 }
 
 function selectedCard() {
@@ -139,11 +157,11 @@ function selectedCard() {
   const win = st.insights.windows.find((w) => w.reaction.id === r.id);
   const used = (win?.productIds || []).map((id) => S.product(id)).filter(Boolean);
   return h('div', { class: 'selected-card' },
-    h('div', null, h('div', { class: 'mono' }, `Bad day · ${SEVERITY[r.severity]}`), h('h3', null, `${fmtDate(r.date, true)} · ${AREAS[r.area]}`)),
+    h('div', null, h('div', { class: 'mono' }, `Selected bad day · ${SEVERITY[r.severity]}`), h('h3', null, `${fmtDate(r.date, true)} · ${AREAS[r.area]}`)),
     h('div', null, h('button', { class: 'btn small', onclick: () => openBadDay(r) }, 'Edit')),
     r.note ? h('div', { class: 'note' }, `“${r.note}”`) : null,
     h('div', { class: 'used' },
-      h('span', { class: 'mono', style: 'align-self:center;margin-right:6px' }, used.length ? 'Used in the 7 days before:' : 'Nothing used on this area in the 7 days before'),
+      h('span', { class: 'mono', style: 'align-self:center;margin-right:6px' }, used.length ? `On your ${AREAS[r.area].toLowerCase()} between ${fmtDate(addDays(r.date, -7))} and ${fmtDate(r.date)}, you used:` : `Nothing on your ${AREAS[r.area].toLowerCase()} in the 7 days before`),
       used.map((p) => h('button', { class: 'chip', onclick: () => openProduct(p) }, p.name))));
 }
 

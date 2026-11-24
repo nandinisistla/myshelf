@@ -88,147 +88,71 @@ export function drawBottle(p) {
   return s('svg', { viewBox: '0 0 80 140', role: 'img', 'aria-label': `${p.brand || ''} ${p.name}`.trim() }, parts);
 }
 
-// ---------- background cut-out for photos ----------
-const cutCache = new Map();
-// Turn a photo on white into a transparent image where white disappears and every
-// colour keeps its exact look when shown over white (like printing on the tile).
-function whiteToAlpha(img, scale) {
-  const w = Math.max(1, Math.round(img.width * scale));
-  const hh = Math.max(1, Math.round(img.height * scale));
-  const c = document.createElement('canvas');
-  c.width = w; c.height = hh;
-  const ctx = c.getContext('2d', { willReadFrequently: true });
-  ctx.drawImage(img, 0, 0, w, hh);
-  const d = ctx.getImageData(0, 0, w, hh);
-  const px = d.data;
-  let minX = w, minY = hh, maxX = 0, maxY = 0;
-  for (let p = 0, i = 0; i < px.length; i += 4, p++) {
-    const m = Math.min(px[i], px[i + 1], px[i + 2]);
-    let a = 1 - m / 255;
-    a = a < 0.02 ? 0 : Math.min(1, a * 1.15);
-    if (a === 0) { px[i + 3] = 0; continue; }
-    for (let k = 0; k < 3; k++) px[i + k] = Math.max(0, Math.min(255, Math.round((px[i + k] - 255 * (1 - a)) / a)));
-    px[i + 3] = Math.round(a * 255);
-    const x = p % w, y = (p / w) | 0;
-    if (x < minX) minX = x; if (x > maxX) maxX = x; if (y < minY) minY = y; if (y > maxY) maxY = y;
-  }
-  if (maxX <= minX || maxY <= minY) return null;
-  ctx.putImageData(d, 0, 0);
-  const pad = 4;
-  const out = document.createElement('canvas');
-  out.width = Math.min(w, maxX - minX + 1 + pad * 2); out.height = Math.min(hh, maxY - minY + 1 + pad * 2);
-  out.getContext('2d').drawImage(c, Math.max(0, minX - pad), Math.max(0, minY - pad), out.width, out.height, 0, 0, out.width, out.height);
-  return out.toDataURL('image/png');
-}
-
-export function cutout(src) {
-  if (cutCache.has(src)) return cutCache.get(src);
+// ---------- getting a product photo ready for the shelf ----------
+// No cutting out: the photo is cropped to the product, its background is levelled to
+// pure white, and the face is "multiplied" onto the grey tile. White then vanishes into
+// the tile exactly, while the product keeps every pixel, edge and shadow it was shot with.
+const prepCache = new Map();
+export function prepare(src) {
+  if (prepCache.has(src)) return prepCache.get(src);
   const pr = new Promise((resolve) => {
     const img = new Image();
     img.onload = () => {
       try {
-        const scale = Math.min(1, 1000 / Math.max(img.width, img.height));
+        const scale = Math.min(1, 1400 / Math.max(img.width, img.height));
         const w = Math.max(1, Math.round(img.width * scale));
         const hh = Math.max(1, Math.round(img.height * scale));
         const c = document.createElement('canvas');
         c.width = w; c.height = hh;
         const ctx = c.getContext('2d', { willReadFrequently: true });
+        ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, w, hh);       // transparent PNGs → white
         ctx.drawImage(img, 0, 0, w, hh);
         const data = ctx.getImageData(0, 0, w, hh);
         const px = data.data;
         // background colour = median of the border
         const border = [];
-        for (let x = 0; x < w; x += 2) { border.push((x) * 4, ((hh - 1) * w + x) * 4); }
-        for (let y = 0; y < hh; y += 2) { border.push((y * w) * 4, (y * w + w - 1) * 4); }
+        for (let x = 0; x < w; x += 2) border.push(x * 4, ((hh - 1) * w + x) * 4);
+        for (let y = 0; y < hh; y += 2) border.push(y * w * 4, (y * w + w - 1) * 4);
         const med = (k) => { const v = border.map((i) => px[i + k]).sort((a, b) => a - b); return v[v.length >> 1]; };
         const bg = [med(0), med(1), med(2)];
-        // How even is the background? Product photos are usually shot on plain white.
-        const spread = border.reduce((m, i) => Math.max(m, Math.abs(px[i] - bg[0]) + Math.abs(px[i + 1] - bg[1]) + Math.abs(px[i + 2] - bg[2])), 0);
-        const light = bg[0] + bg[1] + bg[2] > 690;
-        if (!light && spread > 60) return resolve(null);   // busy background: don't guess
-        const tol = light ? 10 : 26;                        // tight, so white bottles keep their edges
-        const isBg = (i) => {
-          const dr = px[i] - bg[0], dg = px[i + 1] - bg[1], db = px[i + 2] - bg[2];
-          return dr * dr + dg * dg + db * db < tol * tol;
-        };
-        const seen = new Uint8Array(w * hh);
-        const stack = [];
-        const push = (p) => { if (!seen[p] && isBg(p * 4)) { seen[p] = 1; stack.push(p); } };
-        for (let x = 0; x < w; x++) { push(x); push((hh - 1) * w + x); }
-        for (let y = 0; y < hh; y++) { push(y * w); push(y * w + w - 1); }
-        while (stack.length) {
-          const p = stack.pop();
-          const x = p % w, y = (p / w) | 0;
-          if (x > 0) push(p - 1); if (x < w - 1) push(p + 1);
-          if (y > 0) push(p - w); if (y < hh - 1) push(p + w);
+        const offBorder = border.filter((i) => Math.abs(px[i] - bg[0]) + Math.abs(px[i + 1] - bg[1]) + Math.abs(px[i + 2] - bg[2]) > 30).length / border.length;
+        const light = bg[0] + bg[1] + bg[2] > 660 && offBorder < 0.25;
+        if (!light) return resolve({ url: src, blend: false });   // a scene, not a packshot: show it as a photo card
+
+        // Level the background to pure white, so it disappears completely on the tile.
+        const gain = bg.map((v) => 255 / Math.max(1, v));
+        for (let i = 0; i < px.length; i += 4) {
+          px[i] = Math.min(255, px[i] * gain[0]);
+          px[i + 1] = Math.min(255, px[i + 1] * gain[1]);
+          px[i + 2] = Math.min(255, px[i + 2] * gain[2]);
         }
-        // A product is one solid object: everything between its edges on each row and
-        // each column belongs to it. This keeps shiny white highlights and white caps whole.
-        for (let y = 0; y < hh; y++) {
-          let l = -1, r = -1;
-          for (let x = 0; x < w; x++) if (!seen[y * w + x]) { if (l < 0) l = x; r = x; }
-          if (l >= 0) for (let x = l; x <= r; x++) seen[y * w + x] = 0;
+        // Crop to the product (and its shadow) so it fills the tile.
+        const rowHits = new Uint32Array(hh), colHits = new Uint32Array(w);
+        for (let y = 0; y < hh; y++) for (let x = 0; x < w; x++) {
+          const i = (y * w + x) * 4;
+          if (765 - px[i] - px[i + 1] - px[i + 2] > 36) { rowHits[y]++; colHits[x]++; }
         }
-        for (let x = 0; x < w; x++) {
-          let t = -1, btm = -1;
-          for (let y = 0; y < hh; y++) if (!seen[y * w + x]) { if (t < 0) t = y; btm = y; }
-          if (t >= 0) for (let y = t; y <= btm; y++) seen[y * w + x] = 0;
-        }
-        // Smooth outline: blur the mask a little and use it as a soft alpha, so the edge is
-        // a clean curve instead of the pixel-by-pixel staircase of the photo's background.
-        let m = new Float32Array(w * hh);
-        for (let p = 0; p < w * hh; p++) m[p] = seen[p] ? 0 : 1;
-        const r = Math.max(1, Math.round(Math.max(w, hh) / 500));
-        const tmp = new Float32Array(w * hh);
-        for (let pass = 0; pass < 2; pass++) {
-          for (let y = 0; y < hh; y++) {           // horizontal
-            let acc = 0; const row = y * w;
-            for (let x = -r; x <= r; x++) acc += m[row + Math.min(w - 1, Math.max(0, x))];
-            for (let x = 0; x < w; x++) {
-              tmp[row + x] = acc / (2 * r + 1);
-              acc += m[row + Math.min(w - 1, x + r + 1)] - m[row + Math.max(0, x - r)];
-            }
-          }
-          for (let x = 0; x < w; x++) {            // vertical
-            let acc = 0;
-            for (let y = -r; y <= r; y++) acc += tmp[Math.min(hh - 1, Math.max(0, y)) * w + x];
-            for (let y = 0; y < hh; y++) {
-              m[y * w + x] = acc / (2 * r + 1);
-              acc += tmp[Math.min(hh - 1, y + r + 1) * w + x] - tmp[Math.max(0, y - r) * w + x];
-            }
-          }
-        }
-        let minX = w, minY = hh, maxX = 0, maxY = 0, fg = 0;
-        for (let p = 0; p < w * hh; p++) {
-          let a = (m[p] - 0.3) / 0.4;              // soft, centred on the original edge
-          a = a <= 0 ? 0 : a >= 1 ? 1 : a * a * (3 - 2 * a);
-          px[p * 4 + 3] = Math.round(a * 255);
-          if (a === 0) continue;
-          if (!seen[p]) fg++;
-          const x = p % w, y = (p / w) | 0;
-          if (x < minX) minX = x; if (x > maxX) maxX = x; if (y < minY) minY = y; if (y > maxY) maxY = y;
-        }
-        const ratio = fg / (w * hh);
-        if (ratio < 0.04 || ratio > 0.985) return resolve(light ? whiteToAlpha(img, scale) : null);
-        // Only trust the cut-out if it still looks like a whole product. White products on
-        // white backgrounds can get eaten away; those are blended onto the tile instead.
-        const bw = (maxX - minX + 1) / w, bh = (maxY - minY + 1) / hh;
-        if (bw < 0.2 || bh < 0.3 || ratio < 0.08) {
-          // Fall back to "white becomes see-through": the photo sits on the grey tile
-          // like a print, with nothing cut away.
-          return resolve(light ? whiteToAlpha(img, scale) : null);
-        }
+        const minRow = Math.max(2, w * 0.004), minCol = Math.max(2, hh * 0.004);
+        let top = rowHits.findIndex((n) => n >= minRow), left = colHits.findIndex((n) => n >= minCol);
+        let bottom = hh - 1 - [...rowHits].reverse().findIndex((n) => n >= minRow);
+        let right = w - 1 - [...colHits].reverse().findIndex((n) => n >= minCol);
+        if (top < 0 || left < 0 || bottom <= top || right <= left) { top = 0; left = 0; bottom = hh - 1; right = w - 1; }
+        const pad = Math.round(Math.max(right - left, bottom - top) * 0.04);
+        top = Math.max(0, top - pad); left = Math.max(0, left - pad);
+        bottom = Math.min(hh - 1, bottom + pad); right = Math.min(w - 1, right + pad);
         ctx.putImageData(data, 0, 0);
         const out = document.createElement('canvas');
-        out.width = maxX - minX + 1; out.height = maxY - minY + 1;
-        out.getContext('2d').drawImage(c, minX, minY, out.width, out.height, 0, 0, out.width, out.height);
-        resolve(out.toDataURL('image/png'));
-      } catch { resolve(null); }
+        out.width = right - left + 1; out.height = bottom - top + 1;
+        const o = out.getContext('2d');
+        o.fillStyle = '#fff'; o.fillRect(0, 0, out.width, out.height);
+        o.drawImage(c, left, top, out.width, out.height, 0, 0, out.width, out.height);
+        resolve({ url: out.toDataURL('image/jpeg', 0.93), blend: true });
+      } catch { resolve({ url: src, blend: false }); }
     };
-    img.onerror = () => resolve(null);
+    img.onerror = () => resolve({ url: src, blend: false });
     img.src = src;
   });
-  cutCache.set(src, pr);
+  prepCache.set(src, pr);
   return pr;
 }
 
@@ -242,9 +166,9 @@ function frontFace(p) {
   const src = imageSrc(p);
   if (!src) return h('div', { class: 'face front' }, drawBottle(p));
   const face = h('div', { class: 'face front loading' });
-  cutout(src).then((cut) => {
-    const img = h('img', { src: cut || src, alt: `${p.brand || ''} ${p.name}`.trim(), class: cut ? '' : 'blend', draggable: 'false' });
-    img.onload = () => { face.classList.remove('loading'); face.replaceChildren(img); };
+  prepare(src).then(({ url, blend }) => {
+    const img = h('img', { src: url, alt: `${p.brand || ''} ${p.name}`.trim(), class: blend ? 'photo' : 'photo boxed', draggable: 'false' });
+    img.onload = () => { face.classList.remove('loading'); face.classList.toggle('blend', blend); face.replaceChildren(img); };
     img.onerror = () => { face.classList.remove('loading'); face.replaceChildren(drawBottle(p)); };
   });
   return face;
@@ -305,7 +229,9 @@ export async function rankImages(options) {
 
 // ---------- the interactive bottle ----------
 export function renderBottle(p, { big = false, onOpen, showName = true } = {}) {
-  const flip = h('div', { class: 'flip' }, frontFace(p), h('div', { class: 'face back' }, quoteCard(p, big)));
+  const front = frontFace(p);
+  const back = h('div', { class: 'face back' }, quoteCard(p, big));
+  const flip = h('div', { class: 'flip' }, front, back);
   const suspect = S.isSuspectProduct(p);
   const el = h('div', {
     class: 'bottle' + (big ? '' : ' can-hover') + (p.stopped ? ' stopped' : ''),
@@ -321,7 +247,8 @@ export function renderBottle(p, { big = false, onOpen, showName = true } = {}) {
     el.classList.toggle('dragging', !animate);
     const n = ((a % 360) + 360) % 360;
     el.classList.toggle('back-side', n > 90 && n < 270);   // only one side is ever drawn
-    flip.style.transform = `rotateY(${a}deg)`;
+    front.style.transform = `perspective(900px) rotateY(${a}deg)`;
+    back.style.transform = `perspective(900px) rotateY(${a + 180}deg)`;
   };
 
   el.addEventListener('pointerdown', (e) => {

@@ -1,7 +1,7 @@
 // Add a product: type a name, pick the match, AI finds the ingredients, you check, done.
 import { h, put, s, toast, openSheet, AREAS, todayISO, compressImage } from './ui.js';
 import { store, mutate, searchProducts, enrich } from './store.js';
-import { renderBottle, cutout, rankImages } from './bottle.js';
+import { renderBottle, prepare, rankImages } from './bottle.js';
 
 export function openAdd({ routineId = null, prefill = '' } = {}) {
   const sh = openSheet({ title: 'Add a product', body: [], foot: [], full: true });
@@ -109,7 +109,7 @@ export function openAdd({ routineId = null, prefill = '' } = {}) {
       const b = renderBottle(fake, { big: true, showName: false });
       if (draft.photo) {
         const front = b.querySelector('.face.front');
-        cutout(draft.photo).then((cut) => front.replaceChildren(h('img', { src: cut || draft.photo, class: cut ? '' : 'boxed', alt: '' })));
+        prepare(draft.photo).then(({ url, blend }) => { front.classList.toggle('blend', blend); front.replaceChildren(h('img', { src: url, class: blend ? 'photo' : 'photo boxed', alt: '' })); });
       }
       preview.replaceChildren(h('div', { class: 'p-tile' }, h('span', { class: 'floor', 'aria-hidden': 'true' }), b), h('div', { class: 'hint' }, 'Tap the bottle to see the back'));
     };
