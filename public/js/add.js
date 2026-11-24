@@ -111,7 +111,7 @@ export function openAdd({ routineId = null, prefill = '' } = {}) {
         const front = b.querySelector('.face.front');
         cutout(draft.photo).then((cut) => front.replaceChildren(h('img', { src: cut || draft.photo, class: cut ? '' : 'boxed', alt: '' })));
       }
-      preview.replaceChildren(b, h('div', { class: 'hint' }, 'Tap the bottle to see the back'));
+      preview.replaceChildren(h('div', { class: 'p-tile' }, h('span', { class: 'floor', 'aria-hidden': 'true' }), b), h('div', { class: 'hint' }, 'Tap the bottle to see the back'));
     };
     drawPreview();
 

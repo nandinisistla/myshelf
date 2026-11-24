@@ -69,7 +69,7 @@ export function openProduct(prod) {
 
     return [
       h('div', { class: 'p-hero' },
-        renderBottle(p, { big: true, showName: false }),
+        h('div', { class: 'p-tile' }, h('span', { class: 'floor', 'aria-hidden': 'true' }), renderBottle(p, { big: true, showName: false })),
         h('div', { class: 'hint' }, 'Tap or drag the bottle to turn it'),
         h('div', { class: 'p-name' }, p.name),
         h('div', { class: 'p-meta' }, [p.brand, AREAS[p.area]].filter(Boolean).join(' · ')),

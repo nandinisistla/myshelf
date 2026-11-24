@@ -28,7 +28,7 @@ export function renderChat(view) {
 
   put(view, h('div', { class: 'top' }, h('h1', { class: 'title' }, 'Ask AI')), intro, msgs);
   renderComposer();
-  requestAnimationFrame(() => { view.scrollTop = view.scrollHeight; });
+  requestAnimationFrame(() => { window.scrollTo({ top: document.body.scrollHeight, behavior: 'instant' }); });
 }
 
 function bubble(role, text, actions) {

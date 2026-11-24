@@ -110,7 +110,11 @@ export function cutout(src) {
         for (let y = 0; y < hh; y += 2) { border.push((y * w) * 4, (y * w + w - 1) * 4); }
         const med = (k) => { const v = border.map((i) => px[i + k]).sort((a, b) => a - b); return v[v.length >> 1]; };
         const bg = [med(0), med(1), med(2)];
-        const tol = 46;
+        // How even is the background? Product photos are usually shot on plain white.
+        const spread = border.reduce((m, i) => Math.max(m, Math.abs(px[i] - bg[0]) + Math.abs(px[i + 1] - bg[1]) + Math.abs(px[i + 2] - bg[2])), 0);
+        const light = bg[0] + bg[1] + bg[2] > 690;
+        if (!light && spread > 60) return resolve(null);   // busy background: don't guess
+        const tol = light ? 16 : 26;                        // tight, so white bottles stay intact
         const isBg = (i) => {
           const dr = px[i] - bg[0], dg = px[i + 1] - bg[1], db = px[i + 2] - bg[2];
           return dr * dr + dg * dg + db * db < tol * tol;
@@ -126,6 +130,13 @@ export function cutout(src) {
           if (x > 0) push(p - 1); if (x < w - 1) push(p + 1);
           if (y > 0) push(p - w); if (y < hh - 1) push(p + w);
         }
+        // A product is one solid object: everything between its left and right edge
+        // on each row belongs to it. This keeps shiny white highlights from turning into holes.
+        for (let y = 0; y < hh; y++) {
+          let l = -1, r = -1;
+          for (let x = 0; x < w; x++) if (!seen[y * w + x]) { if (l < 0) l = x; r = x; }
+          if (l >= 0) for (let x = l; x <= r; x++) seen[y * w + x] = 0;
+        }
         let minX = w, minY = hh, maxX = 0, maxY = 0, fg = 0;
         for (let p = 0; p < w * hh; p++) {
           if (seen[p]) { px[p * 4 + 3] = 0; continue; }
@@ -137,7 +148,7 @@ export function cutout(src) {
           if (nb) px[p * 4 + 3] = 150;
         }
         const ratio = fg / (w * hh);
-        if (ratio < 0.05 || ratio > 0.97) return resolve(null);
+        if (ratio < 0.04 || ratio > 0.985) return resolve(null);
         ctx.putImageData(data, 0, 0);
         const out = document.createElement('canvas');
         out.width = maxX - minX + 1; out.height = maxY - minY + 1;
@@ -163,7 +174,7 @@ function frontFace(p) {
   const src = imageSrc(p);
   if (src) {
     cutout(src).then((cut) => {
-      const img = h('img', { src: cut || src, alt: `${p.brand || ''} ${p.name}`.trim(), class: cut ? '' : 'boxed', draggable: 'false' });
+      const img = h('img', { src: cut || src, alt: `${p.brand || ''} ${p.name}`.trim(), class: cut ? '' : 'blend', draggable: 'false' });
       img.onerror = () => {}; // keep the drawing if the photo fails
       img.onload = () => face.replaceChildren(img);
     });
@@ -232,20 +243,4 @@ export function renderBottle(p, { big = false, onOpen, showName = true } = {}) {
   });
   el.addEventListener('contextmenu', (e) => e.preventDefault());
   return el;
-}
-
-// Faint connected-dots motif (decoration only).
-export function networkMotif(width = 430, height = 120, seed = 7) {
-  let x = seed;
-  const rnd = () => { x = (x * 9301 + 49297) % 233280; return x / 233280; };
-  const pts = Array.from({ length: 34 }, () => [rnd() * width, height * (0.25 + rnd() * 0.75)]);
-  const lines = [];
-  pts.forEach((p, i) => {
-    for (let k = 0; k < 2; k++) {
-      const q = pts[Math.floor(rnd() * pts.length)];
-      if (q !== p) lines.push(s('line', { x1: p[0], y1: p[1], x2: q[0], y2: q[1], stroke: '#9a9a9a', 'stroke-width': 0.6, opacity: 0.5 }));
-    }
-  });
-  const dots = pts.map((p) => s('circle', { cx: p[0], cy: p[1], r: 1.4 + rnd() * 2.6, fill: '#9a9a9a' }));
-  return s('svg', { viewBox: `0 0 ${width} ${height}`, width: '100%', class: 'network-bg', 'aria-hidden': 'true' }, lines, dots);
 }

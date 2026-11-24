@@ -1,71 +1,95 @@
-// Home: My Shelf. Each shelf is a routine you can name.
-import { h, put, s, toast, confirmSheet, openSheet } from './ui.js';
-import { store, mutate } from './store.js';
-import { renderBottle, networkMotif } from './bottle.js';
+// Shelf: your products as clean cards, grouped by routine (your "shelves").
+import { h, put, toast, confirmSheet, openSheet, howLong, AREAS } from './ui.js';
+import { store, mutate, S } from './store.js';
+import { renderBottle } from './bottle.js';
 import { openProduct } from './product.js';
 import { openAdd } from './add.js';
-import { openSettings } from './settings.js';
+
+const pad = (n) => String(n).padStart(2, '0');
 
 export function renderShelf(view) {
   const st = store.state;
+  const numberOf = new Map([...st.products].sort((a, b) => a.id - b.id).map((p, i) => [p.id, i + 1]));
   const onShelf = st.products.filter((p) => !p.stopped);
   const past = st.products.filter((p) => p.stopped).sort((a, b) => (b.stopped || '').localeCompare(a.stopped || ''));
 
-  const header = h('div', { class: 'top' },
-    h('h1', { class: 'wordmark' }, 'My', 'S', h('span', { class: 'h' }, 'h'), 'elf'),
-    h('div', { class: 'h-row' },
-      h('button', { class: 'icon-btn', 'aria-label': 'Settings and skin profile', onclick: openSettings },
-        s('svg', { viewBox: '0 0 24 24' }, s('circle', { cx: 12, cy: 8, r: 3.5 }), s('path', { d: 'M5 20c1-4 4-6 7-6s6 2 7 6' }))),
-      h('button', { class: 'btn primary', onclick: () => openAdd() }, '+ Add')));
+  const head = h('section', { class: 'page-head' },
+    h('div', { class: 'eyebrow mono' }, `Shelf · ${pad(onShelf.length)} product${onShelf.length === 1 ? '' : 's'} in use`),
+    h('h1', { class: 'display' }, 'Your shelf', h('span', { class: 'soft' }, '.')),
+    h('p', { class: 'lede' }, onShelf.length
+      ? `${matchMedia('(hover: hover)').matches ? 'Hover' : 'Press and hold'} a product to see the back of the label. Open it to see every ingredient in plain words.`
+      : 'Add your first product. Type its name and MyShelf finds the photo and the full ingredient list.'),
+    h('div', { style: 'display:flex;gap:10px;margin-top:22px;flex-wrap:wrap' },
+      h('button', { class: 'btn primary', onclick: () => openAdd() }, 'Add a product'),
+      h('button', { class: 'btn', onclick: newShelf }, 'New shelf')));
 
-  const total = onShelf.length;
-  const sub = h('p', { class: 'sub' }, total
-    ? `${total} product${total === 1 ? '' : 's'} on your shelf · tap one to see what's inside`
-    : 'Your shelf is empty. Add your first product and the app finds its ingredients for you.');
-
-  const shelves = st.routines.map((r) => shelfBlock(r, onShelf.filter((p) => p.routine_id === r.id)));
+  const groups = st.routines.map((r, i) => group(r, i + 1, onShelf.filter((p) => p.routine_id === r.id), numberOf));
   const unsorted = onShelf.filter((p) => !p.routine_id || !st.routines.some((r) => r.id === p.routine_id));
-  if (unsorted.length) shelves.push(shelfBlock({ id: null, name: 'Unsorted' }, unsorted));
+  if (unsorted.length) groups.push(group({ id: null, name: 'Unsorted' }, st.routines.length + 1, unsorted, numberOf));
 
-  const addShelf = h('button', { class: 'btn ghost small', style: 'margin-top:18px', onclick: () => newShelf() }, '+ New shelf');
+  const pastBlock = past.length ? h('details', { class: 'past-toggle' },
+    h('summary', { class: 'mono', style: 'cursor:pointer;list-style:none' }, `No longer using · ${pad(past.length)}  ↓`),
+    h('div', { class: 'grid', style: 'margin-top:18px' }, past.map((p) => card(p, numberOf)))) : null;
 
-  const pastBlock = past.length ? h('details', { class: 'past' },
-    h('summary', null, `No longer using (${past.length}) ▾`),
-    h('div', { class: 'shelf-row', style: 'min-height:140px' }, past.map((p) => renderBottle(p, { onOpen: openProduct }))),
-    h('div', { class: 'plank' })) : null;
-
-  put(view, header, sub, ...shelves, addShelf, pastBlock, networkMotif());
+  put(view, head, groups, pastBlock);
 }
 
-function shelfBlock(r, products) {
-  const nameBtn = r.id
-    ? h('button', { class: 'shelf-name', title: 'Rename this shelf', onclick: (e) => renameInline(e.currentTarget, r) }, r.name)
-    : h('span', { class: 'shelf-name' }, r.name);
-  const menu = r.id ? h('button', { class: 'btn ghost small', 'aria-label': `Remove shelf ${r.name}`, onclick: () => removeShelf(r) }, '···') : null;
-  return h('section', { class: 'shelf', 'aria-label': `${r.name} shelf` },
-    h('div', { class: 'shelf-head' },
-      h('div', { class: 'h-row' }, nameBtn, h('span', { class: 'shelf-count' }, products.length ? `· ${products.length}` : '')),
-      menu),
-    h('div', { class: 'shelf-row' },
-      products.map((p) => renderBottle(p, { onOpen: openProduct })),
-      h('button', { class: 'ghost-slot', 'aria-label': `Add a product to ${r.name}`, onclick: () => openAdd({ routineId: r.id }) }, '+')),
-    h('div', { class: 'plank' }));
+function group(r, n, products, numberOf) {
+  const nameEl = r.id
+    ? h('h2', null, h('button', { title: 'Rename', onclick: (e) => renameInline(e.currentTarget.parentElement, r) }, r.name))
+    : h('h2', null, r.name);
+  return h('section', { class: 'shelf-group', 'aria-label': `${r.name} shelf` },
+    h('div', { class: 'group-head' },
+      h('span', { class: 'num' }, pad(n)),
+      nameEl,
+      h('span', { class: 'rule' }),
+      h('span', { class: 'mono' }, `${pad(products.length)} item${products.length === 1 ? '' : 's'}`),
+      r.id ? h('button', { class: 'mono-btn', onclick: () => removeShelf(r) }, 'Remove') : h('span')),
+    h('div', { class: 'grid' },
+      products.map((p) => card(p, numberOf)),
+      h('button', { class: 'add-tile', 'aria-label': `Add a product to ${r.name}`, onclick: () => openAdd({ routineId: r.id }) },
+        h('div', null, h('b', null, '+'), h('span', null, 'Add product')))));
 }
 
-function renameInline(btn, r) {
-  const input = h('input', { class: 'shelf-name-input', value: r.name, 'aria-label': 'Shelf name', maxlength: 40 });
-  btn.replaceWith(input);
+function card(p, numberOf) {
+  const st = store.state;
+  const suspect = S.isSuspectProduct(p);
+  const tile = h('div', { class: 'tile' + (p.stopped ? ' stopped' : '') },
+    h('span', { class: 'corner l' }, `Nº ${pad(numberOf.get(p.id) || 0)}`),
+    suspect ? h('span', { class: 'tdot', title: 'Contains a likely trigger' }) : null,
+    h('span', { class: 'corner r' }, AREAS[p.area] || ''),
+    h('span', { class: 'floor', 'aria-hidden': 'true' }),
+    renderBottle(p, { onOpen: openProduct, showName: false }));
+  const right = p.stopped ? `Until ${shortDate(p.stopped)}` : howLong(p.started, st.today);
+  const desc = [p.brand, p.summary].filter(Boolean).join(' · ') || p.brand || '';
+  return h('article', { class: 'pcard' },
+    tile,
+    h('div', { class: 'pmeta' },
+      h('button', { class: 'pname', onclick: () => openProduct(p) }, p.name),
+      h('span', { class: 'pright' }, right)),
+    h('div', { class: 'pdesc', title: desc }, desc));
+}
+
+function shortDate(iso) {
+  return new Date(iso + 'T12:00:00Z').toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' });
+}
+
+function renameInline(h2, r) {
+  const input = h('input', { value: r.name, 'aria-label': 'Shelf name', maxlength: 40 });
+  const old = [...h2.childNodes];
+  h2.replaceChildren(input);
   input.focus(); input.select();
   let done = false;
+  const restore = () => h2.replaceChildren(...old);
   const save = async () => {
     if (done) return; done = true;
     const name = input.value.trim();
     if (name && name !== r.name) {
       try { await mutate('routine.rename', { id: r.id, name }); toast('Shelf renamed'); }
-      catch (e) { toast(e.message); }
-    } else input.replaceWith(btn);
+      catch (e) { toast(e.message); restore(); }
+    } else restore();
   };
-  input.addEventListener('keydown', (e) => { if (e.key === 'Enter') save(); if (e.key === 'Escape') { done = true; input.replaceWith(btn); } });
+  input.addEventListener('keydown', (e) => { if (e.key === 'Enter') save(); if (e.key === 'Escape') { done = true; restore(); } });
   input.addEventListener('blur', save);
 }
 
