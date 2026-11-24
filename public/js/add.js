@@ -1,7 +1,7 @@
 // Add a product: type a name, pick the match, AI finds the ingredients, you check, done.
-import { h, put, s, toast, openSheet, AREAS, todayISO } from './ui.js';
+import { h, put, s, toast, openSheet, AREAS, todayISO, compressImage } from './ui.js';
 import { store, mutate, searchProducts, enrich } from './store.js';
-import { renderBottle } from './bottle.js';
+import { renderBottle, cutout } from './bottle.js';
 
 export function openAdd({ routineId = null, prefill = '' } = {}) {
   const sh = openSheet({ title: 'Add a product', body: [], foot: [], full: true });
@@ -67,7 +67,7 @@ export function openAdd({ routineId = null, prefill = '' } = {}) {
     try {
       const info = await enrich({ name: pick.name, brand: pick.brand, ingredientsText: pick.ingredientsText });
       clearInterval(tick);
-      stepReview({ ...info, image_url: pick.image || null });
+      stepReview({ ...info, obfImage: pick.image || null });
     } catch (e) {
       clearInterval(tick);
       stepFailed(pick, e.message);
@@ -86,7 +86,7 @@ export function openAdd({ routineId = null, prefill = '' } = {}) {
       h('button', { class: 'btn primary block', onclick: () => {
         const ingredients = paste.value.split(/,(?![^()]*\))|\n|;/).map((t) => t.trim()).filter(Boolean)
           .map((inci) => ({ inci, plain: inci, family: 'Other', does: '', for_you: '', flag: 'neutral' }));
-        stepReview({ name: pick.name, brand: pick.brand || '', area: 'face', kind: 'bottle', ingredients, sources: [], confidence: 'low', image_url: pick.image || null });
+        stepReview({ name: pick.name, brand: pick.brand || '', area: 'face', kind: 'bottle', ingredients, sources: [], confidence: 'low', images: [], obfImage: pick.image || null });
       } }, 'Continue'));
   }
 
@@ -94,12 +94,42 @@ export function openAdd({ routineId = null, prefill = '' } = {}) {
   function stepReview(info) {
     sh.setTitle('Check and add');
     const st = store.state;
-    const draft = { ...info, routine_id: routineId || guessRoutine(info.area), started: todayISO() };
+    const options = [
+      ...(info.images || []),
+      ...(info.obfImage ? [{ url: info.obfImage, source: 'Open Beauty Facts' }] : []),
+    ];
+    const draft = { ...info, routine_id: routineId || guessRoutine(info.area), started: todayISO(), image_url: options[0]?.url || null, photo: null };
+    const creditFor = (url) => {
+      const o = options.find((x) => x.url === url);
+      return o ? (o.source === 'Open Beauty Facts' ? 'Photo: Open Beauty Facts (CC BY-SA)' : `Image: ${o.source}`) : null;
+    };
     const preview = h('div', { class: 'p-hero' });
-    const drawPreview = () => preview.replaceChildren(
-      renderBottle({ ...draft, id: -1, ingredients: draft.ingredients || [] }, { big: true, showName: false }),
-      h('div', { class: 'hint' }, 'Tap the bottle to see the back'));
+    const drawPreview = () => {
+      const fake = { ...draft, id: -1, ingredients: draft.ingredients || [], has_photo: false, image_url: draft.photo ? null : draft.image_url };
+      const b = renderBottle(fake, { big: true, showName: false });
+      if (draft.photo) {
+        const front = b.querySelector('.face.front');
+        cutout(draft.photo).then((cut) => front.replaceChildren(h('img', { src: cut || draft.photo, class: cut ? '' : 'boxed', alt: '' })));
+      }
+      preview.replaceChildren(b, h('div', { class: 'hint' }, 'Tap the bottle to see the back'));
+    };
     drawPreview();
+
+    const fileIn = h('input', { type: 'file', accept: 'image/*', capture: 'environment', style: 'display:none', onchange: async (e) => {
+      const f = e.target.files[0];
+      if (!f) return;
+      try { draft.photo = await compressImage(f, 900, 0.8); draft.image_url = null; drawPicker(); drawPreview(); } catch (ex) { toast(ex.message); }
+    } });
+    const picker = h('div', { class: 'picker', role: 'radiogroup', 'aria-label': 'Product picture' });
+    const tile = (on, label, content, onclick) => h('button', { class: 'pick' + (on ? ' on' : ''), role: 'radio', 'aria-checked': String(on), 'aria-label': label, onclick }, content);
+    const drawPicker = () => put(picker,
+      options.map((o, i) => tile(!draft.photo && draft.image_url === o.url, `Picture ${i + 1} from ${o.source}`,
+        [h('img', { src: `/api/lookup?img=${encodeURIComponent(o.url)}`, alt: '', loading: 'lazy', onerror: (e) => { e.target.closest('.pick').remove(); } }), h('span', null, o.source)],
+        () => { draft.image_url = o.url; draft.photo = null; drawPicker(); drawPreview(); })),
+      draft.photo ? tile(true, 'Your photo', [h('img', { src: draft.photo, alt: '' }), h('span', null, 'Your photo')], () => {}) : null,
+      tile(false, 'Take or upload my own photo', [h('div', { class: 'pick-icon' }, '+'), h('span', null, 'My photo')], () => fileIn.click()),
+      fileIn);
+    drawPicker();
 
     const name = h('input', { class: 'input', value: draft.name, oninput: (e) => { draft.name = e.target.value; } });
     const brand = h('input', { class: 'input', value: draft.brand || '', oninput: (e) => { draft.brand = e.target.value; } });
@@ -123,6 +153,9 @@ export function openAdd({ routineId = null, prefill = '' } = {}) {
     const err = h('div', { class: 'err' });
     sh.setBody(
       preview,
+      h('div', { class: 'section-h', style: 'margin-top:8px' }, options.length ? 'Pick the right picture' : 'Picture'),
+      options.length ? null : h('p', { class: 'muted small', style: 'margin-top:-4px' }, 'No photo found online for this one. Add your own, or keep the simple placeholder.'),
+      picker,
       h('div', { class: 'ai-note' },
         h('b', null, 'Check this before saving. '),
         `AI found ${ings.length} ingredient${ings.length === 1 ? '' : 's'}${info.confidence ? ` (confidence: ${info.confidence})` : ''}. It can make mistakes, so remove anything that looks wrong.`,
@@ -140,7 +173,12 @@ export function openAdd({ routineId = null, prefill = '' } = {}) {
         if (!draft.name.trim()) { err.textContent = 'Add a name.'; return; }
         e.currentTarget.disabled = true;
         try {
-          await mutate('product.add', { ...draft, ingredients: ings, image_credit: draft.image_url ? 'Photo: Open Beauty Facts (CC BY-SA)' : null });
+          const before = new Set(store.state.products.map((x) => x.id));
+          await mutate('product.add', { ...draft, photo: undefined, ingredients: ings, image_credit: creditFor(draft.image_url), image_options: options });
+          if (draft.photo) {
+            const added = store.state.products.find((x) => !before.has(x.id));
+            if (added) await mutate('product.photo', { id: added.id, data: draft.photo });
+          }
           sh.close();
           const shelfName = store.state.routines.find((r) => r.id === draft.routine_id)?.name;
           toast(`Added to ${shelfName || 'your shelf'}`);

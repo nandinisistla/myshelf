@@ -50,8 +50,7 @@ export function openProduct(prod) {
         p.stopped
           ? h('button', { class: 'btn', onclick: () => act('product.restart', 'Back on your shelf') }, 'Put back on shelf')
           : h('button', { class: 'btn', onclick: () => act('product.stop', 'Moved off your shelf · kept in history') }, 'Stop using'),
-        h('button', { class: 'btn', onclick: () => fileInput.click() }, p.has_photo ? 'Change photo' : 'Use my own photo'),
-        p.has_photo ? h('button', { class: 'btn ghost small', onclick: () => mutate('product.photo', { id: p.id, data: null }).then(() => toast('Photo removed')) }, 'Remove photo') : null,
+        h('button', { class: 'btn', onclick: () => pickPicture(p, fileInput) }, 'Change picture'),
         h('button', { class: 'btn ghost danger', onclick: () => remove(p) }, 'Delete'),
         fileInput));
 
@@ -122,6 +121,31 @@ export function openProduct(prod) {
         h('button', { class: 'btn primary', onclick: saveEdit }, 'Save list'),
         h('button', { class: 'btn', onclick: () => { editing = false; render(); } }, 'Cancel')),
     ];
+  }
+
+  function pickPicture(p, fileInput) {
+    const opts = p.image_options || [];
+    const credit = (o) => (o.source === 'Open Beauty Facts' ? 'Photo: Open Beauty Facts (CC BY-SA)' : `Image: ${o.source}`);
+    const choose = async (o) => {
+      try {
+        if (p.has_photo) await mutate('product.photo', { id: p.id, data: null });
+        await mutate('product.update', { id: p.id, patch: { image_url: o ? o.url : null, image_credit: o ? credit(o) : null } });
+        pk.close(); toast('Picture updated');
+      } catch (e) { toast(e.message); }
+    };
+    const pk = openSheet({
+      title: 'Change picture',
+      body: [
+        opts.length ? h('p', { class: 'muted' }, 'Pictures found online for this product:') : h('p', { class: 'muted' }, 'No pictures were found online for this product. Add your own photo.'),
+        h('div', { class: 'picker' },
+          opts.map((o) => h('button', { class: 'pick' + (!p.has_photo && p.image_url === o.url ? ' on' : ''), onclick: () => choose(o) },
+            h('img', { src: `/api/lookup?img=${encodeURIComponent(o.url)}`, alt: '', loading: 'lazy', onerror: (e) => e.target.closest('.pick').remove() }),
+            h('span', null, o.source))),
+          h('button', { class: 'pick' + (p.has_photo ? ' on' : ''), onclick: () => { pk.close(); fileInput.click(); } },
+            h('div', { class: 'pick-icon' }, '+'), h('span', null, p.has_photo ? 'New photo' : 'My photo'))),
+        h('div', { style: 'margin-top:16px' }, h('button', { class: 'link', onclick: () => choose(null) }, 'Use the simple placeholder instead')),
+      ],
+    });
   }
 
   async function save(patch, msg) {

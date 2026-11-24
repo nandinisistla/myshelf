@@ -90,9 +90,16 @@ async function runTool(name, input, ctx) {
         ingredientsText: input.ingredients_text || obf?.ingredientsText || '',
         profile: ctx.state.profile, useWeb: !input.ingredients_text,
       });
+      const options = [
+        ...(info.images || []),
+        ...(obf?.image ? [{ url: obf.image, source: 'Open Beauty Facts' }] : []),
+      ];
+      const first = options[0];
       const p = await core.addProduct({
         ...info, routine: input.routine, started: input.started, today: t,
-        image_url: obf?.image || null, image_credit: obf?.image ? OBF_CREDIT : null,
+        image_url: first?.url || null,
+        image_credit: first ? (first.source === 'Open Beauty Facts' ? OBF_CREDIT : `Image: ${first.source}`) : null,
+        image_options: options,
       }, src);
       const img = ctx.images[input.use_photo_index];
       if (img) await core.setPhoto(p.id, img, src);
