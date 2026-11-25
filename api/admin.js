@@ -84,7 +84,7 @@ async function demo(action, body, todayISO) {
     const info = body.info && typeof body.info === 'object' ? body.info : {};
     const images = Array.isArray(info.images) ? info.images : [];
     const routine = (await q(`select id from routines where lower(name) = lower($1) limit 1`, [item.routine]))[0];
-    const first = images[0];
+    const first = item.image || images[0];
     const curated = item.ingredients ? { ingredients: item.ingredients, summary: item.summary, kind: item.kind,
       confidence: 'high', ai_note: 'Ingredients from the product label.', sources: [] } : {};
     const p = await addProduct({
