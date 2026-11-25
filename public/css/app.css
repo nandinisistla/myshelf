@@ -57,8 +57,9 @@ svg { display: block; }
   .nav { grid-template-columns: 1fr auto; height: auto; padding-top: 10px; padding-bottom: 8px; row-gap: 6px; }
   .nav-links { grid-column: 1 / -1; grid-row: 2; overflow-x: auto; }
   .nav-links a { padding: 6px 10px; font-size: 11px; }
-  .bd-text { display: none; }
+  .bad-day { padding: 6px 12px; font-size: 13.5px; }
 }
+@media (max-width: 339px) { .bd-text { display: none; } }
 
 /* ---------- hero ---------- */
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
@@ -137,7 +138,8 @@ textarea.input { resize: vertical; min-height: 84px; }
 .group-head .rule { height: 1px; background: var(--hair); align-self: center; }
 .group-head input { font-size: 26px; border: 0; border-bottom: 1px solid var(--rule); background: transparent; outline: none; padding: 0; width: 240px; }
 .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(232px, 1fr)); gap: 28px 22px; }
-@media (max-width: 560px) { .grid { grid-template-columns: repeat(2, 1fr); gap: 20px 12px; } }
+.grid > * { min-width: 0; }
+@media (max-width: 560px) { .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 22px 12px; } }
 
 .pcard { min-width: 0; }
 .tile {
@@ -759,7 +761,7 @@ button.rail-item:hover:not(.on) .n { text-decoration: underline; text-underline-
 .pill-s .fm-dot { width: 8px; height: 8px; display: inline-block; }
 .fm-short { margin: 12px 0 0; font-size: 15px; cursor: help; }
 .fm-where-row { display: flex; flex-wrap: wrap; gap: 14px 26px; margin-top: 14px; }
-.fm-group { display: flex; align-items: center; gap: 8px; }
+.fm-group { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 .fm-group .lbl { font-family: var(--mono); font-size: 10.5px; letter-spacing: .06em; text-transform: uppercase; white-space: nowrap; color: var(--muted); }
 .fm-group .lbl.ok { color: #2f5a39; } .fm-group .lbl.no { color: var(--ink); } .fm-group .lbl.warn { color: var(--amber-ink); }
 .fm-ask .chip { min-width: 40px; font-weight: 700; }
@@ -947,3 +949,37 @@ body.dragging-card, body.dragging-card * { cursor: grabbing !important; user-sel
 .shelf-group.drop-on .group-head h2, .shelf-group.drop-on .group-head h2 button { color: var(--amber-ink); }
 .pcard.just-dropped .tile { animation: drop-in .6s cubic-bezier(.3,1.5,.5,1); }
 @keyframes drop-in { 0% { transform: scale(.92); } 60% { transform: scale(1.03); } 100% { transform: none; } }
+
+/* ---------- phones: everything lines up ---------- */
+@media (max-width: 560px) {
+  /* shelf cards: name on top, how long underneath */
+  .pmeta { flex-direction: column; align-items: flex-start; gap: 2px; margin-top: 10px; }
+  .pname { font-size: 17px; }
+  .pright { font-size: 10.5px; }
+  .pdesc { font-size: 13.5px; }
+  .ptags { gap: 4px; }
+  .ptag { font-size: 9.5px; padding: 2px 7px; }
+  .tile .corner { top: 10px; font-size: 10px; }
+  .tile .corner.r { right: 12px; }
+  .group-head { gap: 10px; }
+  /* History: bad-day title reads left to right, badge underneath */
+  .hs-title { flex-direction: column; align-items: flex-start; gap: 6px; text-align: left; font-size: 18px; }
+  .hs-row.bad .hs-body { padding: 14px 16px; margin-left: 10px; }
+  /* answer card: no picture on small screens */
+  .answer-pic { display: none; }
+  .answer-top { flex-wrap: wrap; gap: 8px; }
+  .answer-actions .btn { width: 100%; justify-content: center; }
+  /* For me profile: name and Edit on one line, tags underneath */
+  .fm-profile { display: grid; grid-template-columns: auto 1fr auto; gap: 12px 14px; padding: 16px; }
+  .fm-profile .pf-avatar { width: 48px; height: 48px; font-size: 16px; }
+  .fm-profile-txt { display: contents; }
+  .fm-profile .pf-name { grid-column: 2; grid-row: 1; align-self: center; font-size: 19px; }
+  .fm-profile > .btn { grid-column: 3; grid-row: 1; }
+  .fm-profile .fm-tags { grid-column: 1 / -1; grid-row: 2; margin: 0; }
+  /* Components page */
+  .sys-part { padding: 30px 0; }
+  .sys-stage.tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+  .sys-stage.row { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 22px 14px; }
+  .sys-stage.pills { grid-template-columns: 1fr; }
+  .sys-swatch { width: 44px; height: 44px; }
+}

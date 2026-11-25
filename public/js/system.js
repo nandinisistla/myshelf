@@ -40,7 +40,7 @@ export function renderSystem(view) {
     part('Pill switch', 'Pick one option. The see-through blob melts to your choice and follows your mouse.', ['Top menu', 'History', 'Product page', 'For me'],
       [variant('Two options', seg(['Plain words', 'Label'])),
        variant('Three options', seg(['Everything', 'Bad days', 'Products'])),
-       variant('Yes / No', h('div', { class: 'fm-ask sys-ask' }, h('span', null, 'Does this sound right?'), ...choice(['Yes', 'No'])))], 'row'),
+       variant('Yes / No', h('div', { class: 'fm-ask sys-ask' }, h('span', null, 'Does this sound right?'), ...choice(['Yes', 'No'])))], 'row pills'),
 
     part('Bad-day dots', 'One dot per bad day, oldest first. Filled: the product was in use the week before.', ['For me', 'History'],
       [variant('Every time', dotRow(8, 8)), variant('Some of the time', dotRow(8, 3)), variant('Never', dotRow(8, 0))], 'row'),
