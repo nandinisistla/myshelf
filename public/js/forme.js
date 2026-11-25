@@ -14,7 +14,17 @@ const AREA_WORD = { face: 'face', scalp: 'scalp', body: 'body' };
 const AREA_KEY = { Face: 'face', 'Hair & scalp': 'scalp', Body: 'body' };
 const joinWords = (xs) => xs.length < 2 ? xs.join('') : `${xs.slice(0, -1).join(', ')} and ${xs[xs.length - 1]}`;
 // "all 8 of your face bad days" / "5 of your 8 face bad days"
-const countOf = (n, total, area) => n === total ? `all ${total} of your ${area} bad days` : `${n} of your ${total} ${area} bad days`;
+// "before every bad day your face had" / "before 5 of the 8 bad days your face had"
+const beforeDays = (n, total, area) => n === total
+  ? (total === 1 ? `before the one bad day your ${area} had` : total === 2 ? `before both bad days your ${area} had` : `before every bad day your ${area} had`)
+  : `before ${n} of the ${total} bad days your ${area} had`;
+// how to talk about an ingredient type: "Fragrance ... it" / "Preservatives ... they"
+const NICE = { 'Coconut-derived': 'Coconut-derived ingredients', 'Cleansers (surfactants)': 'Strong cleansers' };
+const nice = (fam) => NICE[fam] || fam;
+const isPlural = (fam) => fam !== 'Fragrance' && /s$/.test(nice(fam));
+const words = (fam) => isPlural(fam)
+  ? { it: 'they', It: 'They', was: 'were', is: 'are', has: 'have', them: 'them', its: 'they’re' }
+  : { it: 'it', It: 'It', was: 'was', is: 'is', has: 'has', them: 'it', its: 'it’s' };
 const plural = (n, one, many) => (n === 1 ? one : many);
 
 export function renderForMe(view) {
@@ -103,9 +113,9 @@ function productsSection() {
         h('div', { class: 'fm-prod-txt' },
           h('div', { class: 'nm' }, p.name),
           dots(st.reactions.filter((r) => r.area === p.area), (w) => w.productIds.includes(p.id)),
-          h('p', { class: 'fm-line' }, `Used before ${countOf(n, total, area)}.`),
+          h('p', { class: 'fm-line' }, `You were using this ${beforeDays(n, total, area)}.`),
           h('p', { class: 'fm-line ' + (calm ? 'ok' : p.stopped ? '' : 'warn') },
-            p.stopped ? `${calm ? '✓ ' : ''}Stopped ${fmtDate(p.stopped)}${calm ? '. No bad days since.' : '.'}` : 'Still on your shelf.')));
+            p.stopped ? (calm ? `✓ You stopped it on ${fmtDate(p.stopped)}. Your ${area} has been fine since.` : `You stopped it on ${fmtDate(p.stopped)}.`) : 'You’re still using it.')));
     })));
 }
 
@@ -126,7 +136,7 @@ function ingredientsSection() {
   return h('section', { class: 'fm-step' },
     stepHead('What might be causing it'),
     likely.length ? h('div', { class: 'fm-ings' }, likely.map((f) => ingredientCard(f, false))) : null,
-    maybe.length ? h('div', { class: 'fm-sub mono' }, 'Less likely · tap to see more') : null,
+    maybe.length ? h('div', { class: 'fm-sub mono' }, 'Probably not the cause') : null,
     maybe.length ? h('div', { class: 'fm-ings' }, maybe.map((f) => ingredientCard(f, true))) : null);
 }
 const rank = (f) => (f.status === 'agree' ? 0 : f.level === 'strong' ? 1 : 2);
@@ -143,11 +153,13 @@ function ingredientCard(f, compact) {
   const area = AREA_WORD[areaKeys[0]] || areaKeys[0];
   const likely = f.status === 'agree' || f.level === 'strong';
   const names = [f.family, ...(f.together || [])];
+  const w = words(f.family);
+  const N = nice(f.family);
   const sentence = likely
-    ? `It was in your products before ${countOf(f.hits, f.relevant, area)}, and in nothing that works for you.`
+    ? `${N} ${w.was} in something you used ${beforeDays(f.hits, f.relevant, area)}. None of the products that work for you have ${w.them}.`
     : fineOnes.length
-      ? `It was there before ${countOf(f.hits, f.relevant, area)}, but ${joinWords(fineOnes.map((p) => p.name))} ${plural(fineOnes.length, 'has', 'have')} it too and ${plural(fineOnes.length, 'works', 'work')} for you.`
-      : `It was there before ${countOf(f.hits, f.relevant, area)}, not every time.`;
+      ? `${N} ${w.was} there ${beforeDays(f.hits, f.relevant, area)}, but your ${joinWords(fineOnes.map((p) => p.name))} ${plural(fineOnes.length, 'has', 'have')} ${w.them} too and ${plural(fineOnes.length, 'works', 'work')} fine. So ${w.its} probably not the cause.`
+      : `${N} ${w.was} only there ${beforeDays(f.hits, f.relevant, area)}. So ${w.its} probably not the cause.`;
   const choose = async (status) => {
     try { await mutate('insight.status', { family: f.family, status: f.status === status ? 'ai' : status }); }
     catch (e) { toast(e.message); }
@@ -156,15 +168,15 @@ function ingredientCard(f, compact) {
 
   const top = [
     h('div', { class: 'fm-ing-head' },
-      h('h3', null, likely ? `${joinWords(names)} is the likely trigger` : `${joinWords(names)}: less likely`),
-      f.status === 'agree' ? h('span', { class: 'fm-badge on' }, '✓ You confirmed') : likely ? h('span', { class: 'fm-badge on' }, 'Likely') : h('span', { class: 'fm-badge' }, 'Maybe')),
+      h('h3', null, likely ? `${names.length > 1 ? joinWords(names.map(nice)) + ' are' : nice(f.family) + ' ' + w.is} probably what’s bothering your ${area}` : joinWords(names.map(nice))),
+      f.status === 'agree' ? h('span', { class: 'fm-badge on' }, '✓ You confirmed this') : likely ? h('span', { class: 'fm-badge on' }, 'Likely') : h('span', { class: 'fm-badge' }, 'Probably not')),
     dots(st.reactions.filter((r) => areaKeys.includes(r.area)), (w) => w.productIds.some((id) => f.productIds.includes(id))),
     h('p', { class: 'fm-line strong' }, sentence),
-    h('p', { class: 'fm-line muted' }, `Why it can irritate: ${whyShort(f.family)}`)];
+    h('p', { class: 'fm-line muted' }, `Why ${N.toLowerCase()} can bother skin: ${whyShort(f.family)}`)];
   const where = h('div', { class: 'fm-where-row' },
-    stopped.length ? h('div', { class: 'fm-group' }, h('span', { class: 'lbl' }, 'You stopped'), thumbs(stopped, 'past')) : null,
-    live.length ? h('div', { class: 'fm-group' }, h('span', { class: 'lbl warn' }, 'Still using'), thumbs(live, '')) : null,
-    elsewhere.length ? h('div', { class: 'fm-group' }, h('span', { class: 'lbl ok' }, `✓ Fine on your ${joinWords([...new Set(elsewhere.map((p) => AREA_WORD[p.area]))])}`), thumbs(elsewhere, '')) : null);
+    stopped.length ? h('div', { class: 'fm-group' }, h('span', { class: 'lbl' }, 'You stopped using'), thumbs(stopped, 'past')) : null,
+    live.length ? h('div', { class: 'fm-group' }, h('span', { class: 'lbl warn' }, 'You still use'), thumbs(live, '')) : null,
+    elsewhere.length ? h('div', { class: 'fm-group' }, h('span', { class: 'lbl ok' }, `✓ Your ${joinWords([...new Set(elsewhere.map((p) => AREA_WORD[p.area]))])} is fine with these`), thumbs(elsewhere, '')) : null);
   const ask = h('div', { class: 'fm-ask' },
     h('span', null, 'Does this sound right?'),
     h('button', { class: 'chip' + (f.status === 'agree' ? ' on' : ''), onclick: () => choose('agree') }, 'Yes'),
@@ -213,23 +225,24 @@ function avoidSection() {
     const keep = withIt.filter((p) => !p.stopped && isWorking(p));
     const stopped = withIt.filter((p) => p.stopped && (!area || p.area === area));
     const where = area ? AREA_WORD[area] : 'shelf';
+    const label = it.label.toLowerCase();
     const reason = [
-      f ? `It was in your products before ${countOf(f.hits, f.relevant, AREA_WORD[area])}.` : null,
+      f ? `It showed up ${beforeDays(f.hits, f.relevant, AREA_WORD[area])}.` : null,
       f?.status === 'agree' ? 'You confirmed it.' : null,
       it.listed ? 'It’s on your allergen list.' : null].filter(Boolean).join(' ');
+    const keepAreas = joinWords([...new Set(keep.map((p) => AREA_WORD[p.area]))]);
     const status = stillIn.length
-      ? `It’s still in ${joinWords(stillIn.map((p) => p.name))}. Try a version without it.`
-      : keep.length
-        ? `✓ You’ve stopped it${area ? ` on your ${where}` : ''}. It’s only left in products that work for you.`
-        : `✓ Nothing you use${area ? ` on your ${where}` : ''} has it any more.`;
+      ? `It’s still in your ${joinWords(stillIn.map((p) => p.name))}. Try to find a version without it.`
+      : `✓ You’ve already stopped using it${area ? ` on your ${where}` : ''}.`;
     return h('article', { class: 'fm-avoid-item' },
-      h('h3', null, it.label, area ? h('span', { class: 'fm-area' }, ` on your ${where}`) : null),
+      h('h3', null, `Avoid ${label}`, area ? h('span', { class: 'fm-area' }, ` on your ${where}`) : null),
       h('p', { class: 'fm-line strong ' + (stillIn.length ? 'warn' : 'ok') }, status),
-      h('p', { class: 'fm-line muted' }, reason),
+      reason ? h('p', { class: 'fm-line muted' }, `Why: ${reason}`) : null,
+      keep.length ? h('p', { class: 'fm-line' }, `Some of your ${keepAreas} products have ${label} too, but your ${keepAreas} is fine with them, so keep using them.`) : null,
       h('div', { class: 'fm-where-row' },
-        stillIn.length ? h('div', { class: 'fm-group' }, h('span', { class: 'lbl warn' }, 'Swap'), thumbs(stillIn, '')) : null,
-        stopped.length ? h('div', { class: 'fm-group' }, h('span', { class: 'lbl' }, 'You stopped'), thumbs(stopped, 'past')) : null,
-        keep.length ? h('div', { class: 'fm-group' }, h('span', { class: 'lbl ok' }, `✓ Keep: your ${joinWords([...new Set(keep.map((p) => AREA_WORD[p.area]))])} is fine with ${plural(keep.length, 'it', 'them')}`), thumbs(keep, '')) : null));
+        stillIn.length ? h('div', { class: 'fm-group' }, h('span', { class: 'lbl warn' }, 'Swap out'), thumbs(stillIn, '')) : null,
+        stopped.length ? h('div', { class: 'fm-group' }, h('span', { class: 'lbl' }, 'You stopped using'), thumbs(stopped, 'past')) : null,
+        keep.length ? h('div', { class: 'fm-group' }, h('span', { class: 'lbl ok' }, '✓ Keep using'), thumbs(keep, '')) : null));
   });
 
   let watch = null;
@@ -242,12 +255,12 @@ function avoidSection() {
       if (inWorking.length) { cleared.push(`${w.label.toLowerCase()} (in your ${joinWords(inWorking.map((p) => p.name))})`); continue; }
       const past = face.filter((p) => p.stopped && contains(p, w.test));
       chips.push(h('li', null, h('b', null, w.label), ' ', h('span', { class: 'muted' }, w.why),
-        past.length ? h('span', { class: 'was' }, ` It was in your ${joinWords(past.map((p) => p.name))}.`) : null));
+        past.length ? h('span', { class: 'was' }, ` Your ${joinWords(past.map((p) => p.name))} had it.`) : null));
     }
     watch = h('div', { class: 'fm-watch' },
       h('h3', null, 'When you buy something new for your face, skip these'),
       h('ul', null, chips),
-      cleared.length ? h('p', { class: 'fm-line ok' }, `✓ No need to skip ${joinWords(cleared)}: it works for you.`) : null,
+      cleared.length ? h('p', { class: 'fm-line ok' }, `✓ You don’t need to skip ${joinWords(cleared)}. Your skin is fine with it.`) : null,
       h('p', { class: 'fm-src' }, 'Based on dermatologist advice for redness-prone skin: ',
         WATCH_SOURCES.map((x, n) => [n ? ' · ' : '', h('a', { href: x.url, target: '_blank', rel: 'noopener' }, x.title.split(':')[0])])));
   }

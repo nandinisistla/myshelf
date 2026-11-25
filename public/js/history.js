@@ -43,13 +43,13 @@ function headline(st) {
     const after = lastStop ? R.filter((r) => r.area === fam.area && r.date > lastStop).length : 1;
     const calm = !stillUsing && lastStop && after === 0 && daysBetween(lastStop, st.today) >= 14;
     const top = ps[0];
-    const n = fam.hits === fam.relevant ? `every one of your ${fam.relevant}` : `${fam.hits} of your ${fam.relevant}`;
+    const when = fam.hits === fam.relevant ? `before every bad day your ${area} had` : `before ${fam.hits} of the ${fam.relevant} bad days your ${area} had`;
     return h('button', { class: 'hs-headline', onclick: () => { location.hash = '#forme'; } },
       top ? thumb(top, 'lg') : null,
       h('div', null,
         h('div', { class: 'mono' }, fam.status === 'agree' ? 'Your pattern · you confirmed it' : 'Your pattern'),
-        h('p', null, h('b', null, fam.family), ` was in your products before ${n} ${area} bad days.`,
-          calm ? ` Since you cut it out on ${fmtDate(lastStop)}, you’ve been doing good.` : '')));
+        h('p', null, h('b', null, fam.family), ` was in something you used ${when}.`,
+          calm ? ` Since you stopped using it on ${fmtDate(lastStop)}, you’ve been doing good.` : '')));
   }
   const count = new Map();
   for (const w of st.insights.windows || []) for (const id of w.productIds) count.set(id, (count.get(id) || 0) + 1);
