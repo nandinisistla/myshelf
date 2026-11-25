@@ -31,9 +31,28 @@ function hold(min = 750) {
   };
   setTimeout(release, 120);
 }
+// The move to the next part: one steady, eased glide (the same pace every time,
+// whatever the browser's own smooth scrolling does).
+const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+let anim = 0;
+function glide(to) {
+  cancelAnimationFrame(anim);
+  const from = window.scrollY, dist = to - from;
+  if (reduce || Math.abs(dist) < 2) { window.scrollTo({ top: to, behavior: 'instant' }); return 0; }
+  const ms = Math.min(820, Math.max(480, Math.abs(dist) * 0.55));
+  const t0 = performance.now();
+  const ease = (t) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
+  const tick = (now) => {
+    const t = Math.min(1, (now - t0) / ms);
+    window.scrollTo({ top: from + dist * ease(t), behavior: 'instant' });
+    if (t < 1) anim = requestAnimationFrame(tick);
+  };
+  anim = requestAnimationFrame(tick);
+  return ms;
+}
 function go(top) {
-  window.scrollTo({ top, behavior: 'smooth' });
-  hold();
+  const ms = glide(top);
+  hold(ms + 120);
 }
 
 // Returns true when it handled the move (so the browser shouldn't scroll by itself).
@@ -48,7 +67,7 @@ function step(delta, canMove = true) {
   if (delta > 0) {
     const left = cur.bottom - (y + view);          // how much of this part is still below
     if (left > 4) {
-      if (left < delta) { window.scrollTo({ top: y + left }); hold(250); return true; }   // stop at its end
+      if (left < delta) { hold(glide(y + left) + 80); return true; }   // stop at its end
       return false;                                                          // scroll inside it
     }
     if (i < s.length - 1) { if (canMove) go(s[i + 1].top); return true; }
@@ -56,7 +75,7 @@ function step(delta, canMove = true) {
   }
   const above = y - cur.top;                       // how much of this part is above the screen
   if (above > 4) {
-    if (above < -delta) { window.scrollTo({ top: cur.top }); hold(250); return true; }
+    if (above < -delta) { hold(glide(cur.top) + 80); return true; }
     return false;
   }
   if (i > 0) {

@@ -29,9 +29,11 @@ export function renderForMe(view) {
       slide(avoidSection(), safeSection(), disclaimer()));
     return;
   }
+  // One numbered step per screen, so each scroll lands on the start of the next step.
   put(view,
     slide(head, problemsSection()),
-    slide(productsSection(), ingredientsSection()),
+    slide(productsSection()),
+    slide(ingredientsSection()),
     slide(avoidSection()),
     slide(safeSection(), leftovers(), disclaimer()));
 }
