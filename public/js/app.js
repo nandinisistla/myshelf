@@ -11,6 +11,7 @@ import { findPhotos, admin } from './store.js';
 import { loadDemo } from './demo.js';
 import { startBlobs } from './blob.js';
 import { startSlides } from './slides.js';
+import { startEffects, newView } from './effects.js';
 import { imageSrc, scoreImage } from './bottle.js';
 
 const view = document.getElementById('view');
@@ -36,6 +37,7 @@ function render(keepScroll = true) {
     a.classList.toggle('on', on);
     if (on) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current');
   });
+  if (changed) newView();
   TABS[tab](view);
   if (!changed && keepScroll && tab !== 'chat') window.scrollTo({ top: y, behavior: 'instant' });
   if (changed && tab !== 'chat') window.scrollTo({ top: 0, behavior: 'instant' });
@@ -47,6 +49,7 @@ document.getElementById('badDayBtn').addEventListener('click', () => openBadDay(
 document.getElementById('profileBtn').addEventListener('click', () => openSettings());
 startBlobs();
 startSlides();
+startEffects();
 // Show your initials on the profile button once you have a name.
 onChange((st) => {
   const btn = document.getElementById('profileBtn');

@@ -18,20 +18,26 @@ export function renderForMe(view) {
   stepNo = 0;
   const st = store.state;
   const ins = st.insights;
-  const head = h('section', { class: 'page-head slide' },
+  const head = h('section', { class: 'page-head' },
     h('h1', { class: 'display' }, 'What your skin is telling you', h('span', { class: 'soft' }, '.')),
     profileStrip());
 
   if (ins.reactionCount < 2) {
-    put(view, head, problemsSection(), h('div', { class: 'fm-empty' },
-      h('h3', null, ins.reactionCount ? 'One more bad day and the dots start connecting' : 'Nothing to connect yet'),
-      h('p', null, 'When your skin, scalp or body acts up, log it. After two, MyShelf starts comparing what you used before each one.'),
-      h('button', { class: 'btn primary', onclick: () => openBadDay() }, 'Log a bad day')),
-    avoidSection(), safeSection(), disclaimer());
+    put(view,
+      slide(head, problemsSection(), h('div', { class: 'fm-empty' },
+        h('h3', null, ins.reactionCount ? 'One more bad day and the dots start connecting' : 'Nothing to connect yet'),
+        h('p', null, 'When your skin, scalp or body acts up, log it. After two, MyShelf starts comparing what you used before each one.'),
+        h('button', { class: 'btn primary', onclick: () => openBadDay() }, 'Log a bad day'))),
+      slide(avoidSection(), safeSection(), disclaimer()));
     return;
   }
 
-  put(view, head, problemsSection(), productsSection(), ingredientsSection(), avoidSection(), safeSection(), leftovers(), disclaimer());
+  // Four screens, each one slide: you, your patterns, what to avoid, what's safe.
+  put(view,
+    slide(head, problemsSection()),
+    slide(productsSection(), ingredientsSection()),
+    slide(avoidSection()),
+    slide(safeSection(), leftovers(), disclaimer()));
 }
 
 // ---------- 1. products in use before bad days ----------
@@ -46,7 +52,7 @@ function productsSection() {
     return { p, n: count.get(p.id) || 0, total };
   }).filter((x) => x.n >= 2 && x.n / x.total >= 0.6).sort((a, b) => b.n - a.n || b.n / b.total - a.n / a.total);
 
-  return h('section', { class: 'fm-step slide' },
+  return h('section', { class: 'fm-step' },
     stepHead('1', 'Products in use before your bad days'),
     list.length
       ? h('div', { class: 'fm-prods' }, list.map(({ p, n, total }) => {
@@ -74,7 +80,7 @@ function ingredientsSection() {
     .sort((a, b) => rank(a) - rank(b) || b.hits / b.relevant - a.hits / a.relevant || a.fineWith - b.fineWith);
   if (!sus.length) return null;
   const shown = new Set();
-  return h('section', { class: 'fm-step slide' },
+  return h('section', { class: 'fm-step' },
     stepHead('2', 'What might be causing it'),
     (() => {
       const cards = sus.filter((f) => {
@@ -145,10 +151,10 @@ function ingredientCard(f, compact) {
 function dots(reactions, hit) {
   const ws = windowsFor();
   const list = [...reactions].sort((a, b) => a.date.localeCompare(b.date));
-  return h('div', { class: 'fm-dots', 'aria-hidden': 'true' }, list.map((r) => {
+  return h('div', { class: 'fm-dots', 'aria-hidden': 'true' }, list.map((r, idx) => {
     const w = ws.find((x) => x.reaction.id === r.id);
     const on = w && hit(w);
-    return h('span', { class: 'fm-dot' + (on ? ' on' : ''), title: `${fmtDate(r.date)}: ${on ? 'in use the week before' : 'not in use'}` });
+    return h('span', { class: 'fm-dot' + (on ? ' on' : ''), style: `--i:${idx}`, title: `${fmtDate(r.date)}: ${on ? 'in use the week before' : 'not in use'}` });
   }));
 }
 
@@ -157,7 +163,7 @@ function safeSection() {
   const st = store.state;
   const fine = st.insights.fineProductIds.map((id) => S.product(id)).filter(Boolean);
   if (!fine.length) return null;
-  return h('section', { class: 'fm-step slide' },
+  return h('section', { class: 'fm-step' },
     stepHead('4', 'Safe for you so far'),
     h('p', { class: 'fm-intro' }, 'Used for at least two weeks, with no bad day on that area while you were using them.'),
     h('div', { class: 'fm-safe' }, fine.map((p) => h('button', { class: 'fm-safe-item', onclick: () => openProduct(p) },
@@ -265,7 +271,7 @@ function avoidSection() {
       h('p', { class: 'fm-src' }, 'Sources: ', WATCH_SOURCES.map((x, n) => [n ? ' · ' : '', h('a', { href: x.url, target: '_blank', rel: 'noopener' }, x.title)])));
   }
 
-  return h('section', { class: 'fm-step slide' },
+  return h('section', { class: 'fm-step' },
     stepHead('', 'Try to avoid'),
     bothering.length ? h('div', { class: 'fm-avoid' }, bothering) : null,
     watch);
@@ -302,12 +308,12 @@ function problemsSection() {
   const st = store.state;
   const probs = st.profile?.problems || [];
   if (!probs.length) {
-    return h('section', { class: 'fm-step slide' }, stepHead('', 'Your skin problems'),
+    return h('section', { class: 'fm-step' }, stepHead('', 'Your skin problems'),
       h('p', { class: 'muted' }, 'Add your skin problems to your profile and MyShelf shows what on your shelf is working on each one.'),
       h('button', { class: 'btn small', onclick: () => openSettings() }, 'Add to profile'));
   }
   const live = st.products.filter((p) => !p.stopped);
-  return h('section', { class: 'fm-step slide' },
+  return h('section', { class: 'fm-step' },
     stepHead('', 'Your skin problems, and what’s working on them'),
     h('div', { class: 'fm-probs' }, probs.map((pr) => {
       const helpers = live.map((p) => ({ p, ings: productHelps(p).get(pr) })).filter((x) => x.ings);
@@ -320,4 +326,10 @@ function problemsSection() {
           : h('p', { class: 'fm-why' }, 'Nothing on your shelf targets this yet.'),
         LOOK_FOR[pr] ? h('p', { class: 'fm-look' }, h('span', { class: 'mono' }, 'Look for '), LOOK_FOR[pr]) : null);
     })));
+}
+
+// One screen of For me. Empty parts are skipped.
+function slide(...parts) {
+  const kids = parts.flat().filter(Boolean);
+  return kids.length ? h('div', { class: 'slide' }, kids) : null;
 }
