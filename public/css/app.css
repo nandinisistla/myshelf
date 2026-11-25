@@ -655,29 +655,17 @@ button.rail-item:hover:not(.on) .n { text-decoration: underline; text-underline-
 .fm-rows.tight .fm-clear { margin: 0; }
 .fm-row-note { margin: 6px 0 0; font-size: 13.5px; color: var(--muted); }
 
-/* ---------- the morphing glass blob behind selected pills ---------- */
+/* ---------- liquid glass behind selected pills (see blob.js) ---------- */
 .has-blob { position: relative; isolation: isolate; }
-.has-blob > :not(.blob) { position: relative; z-index: 1; }
-.blob { position: absolute; left: 0; top: 0; z-index: 0; pointer-events: none; opacity: 0;
-  background: radial-gradient(120% 140% at 30% 20%, rgba(255,255,255,.75), rgba(255,255,255,.15) 55%), rgba(22,22,21,.07);
-  border: 1px solid rgba(22,22,21,.14);
-  box-shadow: inset 0 1px 1px rgba(255,255,255,.9), inset 0 -2px 6px rgba(22,22,21,.06), 0 6px 18px rgba(22,22,21,.08);
-
-  border-radius: 999px;
-  transition: transform .55s cubic-bezier(.34,1.45,.5,1), width .55s cubic-bezier(.34,1.45,.5,1), height .4s ease, opacity .25s;
-  animation: blob-morph 7s ease-in-out infinite; }
-@keyframes blob-morph {
-  0%, 100% { border-radius: 46% 54% 52% 48% / 58% 50% 50% 42%; }
-  25% { border-radius: 56% 44% 40% 60% / 44% 60% 40% 56%; }
-  50% { border-radius: 42% 58% 60% 40% / 56% 42% 58% 44%; }
-  75% { border-radius: 52% 48% 46% 54% / 40% 56% 44% 60%; }
-}
-@media (prefers-reduced-motion: reduce) { .blob { animation: none; border-radius: 999px; transition: opacity .2s; } }
+.has-blob > :not(.goo) { position: relative; z-index: 1; }
+.goo { position: absolute; inset: -14px; z-index: 0; pointer-events: none; filter: url(#goo); }
+.goo i { position: absolute; left: 0; top: 0; display: block; background: #161615; border-radius: 999px; }
+.goo-main { opacity: 0; transition: transform .6s cubic-bezier(.34,1.4,.5,1), width .6s cubic-bezier(.34,1.4,.5,1), height .4s ease, opacity .25s; }
+.goo-drop { width: 0; height: 0; transform-origin: center; }
+@media (prefers-reduced-motion: reduce) { .goo-main { transition: opacity .2s; } }
 /* the selected pill keeps dark text; the blob is its background now */
 .has-blob > .on, .has-blob > [aria-current="page"] { background: transparent !important; color: var(--ink) !important; border-color: transparent !important; }
 .nav-links a.on { font-weight: 700; }
-/* multi-select chips (skin problems, allergens) get their own little resting blob */
-.chips:not([role="radiogroup"]) .chip.on { color: var(--ink); border-color: rgba(22,22,21,.18);
-  background: radial-gradient(120% 140% at 30% 20%, rgba(255,255,255,.8), rgba(255,255,255,.2) 55%), rgba(22,22,21,.09);
-  box-shadow: inset 0 1px 1px rgba(255,255,255,.9), 0 4px 12px rgba(22,22,21,.08);
-  animation: blob-morph 7s ease-in-out infinite; }
+/* multi-select chips (skin problems, allergens): the same see-through glass, resting */
+.chips:not([role="radiogroup"]) .chip.on { color: var(--ink); background: rgba(22,22,21,.08); border-color: rgba(22,22,21,.38);
+  box-shadow: inset 0 1.5px 0 rgba(255,255,255,.85); }
