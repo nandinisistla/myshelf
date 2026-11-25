@@ -813,3 +813,96 @@ button.rail-item:hover:not(.on) .n { text-decoration: underline; text-underline-
 .msg.assistant { background: var(--paper-2); border-color: var(--hair); line-height: 1.5; }
 .msg .acts .pill { border-color: rgba(63,122,76,.45); color: #2f5a39; background: rgba(63,122,76,.06); }
 .suggest .chip { font-size: 14.5px; }
+
+/* ---------- the answer card: one component on For me, History and the product page ---------- */
+.answer { display: flex; gap: 22px; align-items: flex-start; text-align: left; border: 1px solid var(--amber); background: rgba(192,138,46,.06);
+  border-radius: 16px; padding: 20px 24px; }
+.answer-body { flex: 1; min-width: 0; }
+.answer-pic { flex: 0 0 auto; }
+.answer-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.answer-label { font-family: var(--mono); font-size: 10.5px; letter-spacing: .12em; text-transform: uppercase; color: var(--amber-ink); }
+.answer-title { margin: 6px 0 0; font-size: 22px; font-weight: 400; line-height: 1.25; }
+.answer .fm-dots { margin-top: 12px; }
+.answer-line { margin: 8px 0 0; font-size: 15.5px; line-height: 1.45; max-width: 760px; color: var(--ink-2); }
+.answer-line.strong { color: var(--ink); }
+.answer-line.ok { color: #2f5a39; }
+.answer-line.warn { color: var(--amber-ink); }
+.answer-line.muted { color: var(--muted); font-size: 14.5px; }
+.answer-actions { display: flex; gap: 10px; margin-top: 14px; }
+.why-btn span { transition: translate .25s; }
+.why-btn:hover span { translate: 3px 0; }
+.answer.compact { margin: 6px 0 30px; }
+.answer.compact .answer-title { font-size: 21px; }
+.answer.product { margin: 18px auto 0; max-width: 560px; padding: 16px 20px; gap: 16px; }
+.answer.product .answer-title { font-size: 19px; }
+@media (max-width: 560px) { .answer { flex-direction: column; gap: 12px; padding: 16px 18px; } .answer-title { font-size: 19px; } }
+
+/* ---------- "Show me why": the answer, worked out step by step ---------- */
+.why-stage { max-width: 1000px; margin: 0 auto; padding: 4px 2px 24px; }
+.why-cap { font-size: 24px; line-height: 1.3; min-height: 2.7em; margin: 6px 0 20px; max-width: 820px; }
+.why-cap.in { animation: why-cap .45s ease both; }
+@keyframes why-cap { from { opacity: 0; transform: translateY(6px); } }
+.why-n { font-family: var(--mono); font-size: 12px; color: var(--muted); letter-spacing: .08em; vertical-align: 4px; margin-right: 4px; }
+.why-stage.done .why-cap { color: var(--amber-ink); }
+.why-chart { position: relative; display: grid; grid-template-columns: 210px 1fr; column-gap: 14px; padding: 14px 18px 6px;
+  border: 1px solid var(--hair); border-radius: 16px; background: var(--paper-3); }
+.why-lane, .why-axis { display: contents; }
+.why-lbl { display: flex; align-items: center; gap: 10px; min-width: 0; height: 42px; font-size: 14.5px; transition: opacity .5s; }
+.why-lbl > span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.why-lbl .hs-thumb { width: 30px; height: 34px; }
+.why-lane.days .why-lbl { font-family: var(--mono); font-size: 10.5px; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
+.why-track { position: relative; height: 42px; }
+/* bad days */
+.why-dot { position: absolute; top: 14px; width: 14px; height: 14px; margin-left: -7px; border-radius: 50%; background: var(--amber); border: 2px solid var(--amber);
+  transform: scale(0); transition: transform .45s cubic-bezier(.3,1.7,.5,1), background .4s; transition-delay: calc(var(--i, 0) * 70ms); }
+.s-days .why-dot { transform: scale(1); }
+.s-guides .why-dot:not(.hit) { background: var(--paper-3); }
+/* products: bars draw in, then light up */
+.why-lane:not(.days) .why-lbl { opacity: 0; }
+.s-bars .why-lane:not(.days) .why-lbl { opacity: 1; }
+.why-bar { position: absolute; top: 12px; height: 18px; border-radius: 9px; background: #c3c1bb; overflow: hidden;
+  transform: scaleX(0); transform-origin: left; transition: transform .9s cubic-bezier(.3,.7,.2,1), background .5s, opacity .5s;
+  transition-delay: calc(var(--l, 0) * 90ms), 0s, 0s; }
+.s-bars .why-bar { transform: scaleX(1); }
+.why-bar em { position: absolute; left: 10px; top: 0; line-height: 18px; font-style: normal; font-family: var(--mono); font-size: 10px;
+  letter-spacing: .1em; text-transform: uppercase; color: #fff; white-space: nowrap; opacity: 0; transition: opacity .4s .25s; }
+.s-has .why-lane.has .why-bar { background: var(--amber); }
+.s-has .why-lane.has .why-bar em { opacity: 1; }
+.s-has .why-lane.other .why-bar { opacity: .4; }
+.s-has .why-lane.other .why-lbl { opacity: .5; }
+.s-fine .why-lane.other.fine .why-bar { opacity: 1; background: var(--ok); }
+.s-fine .why-lane.other.fine .why-bar em { opacity: 1; }
+.s-fine .why-lane.other.fine .why-lbl { opacity: 1; }
+/* lines from each bad day down through the products */
+.why-over { position: absolute; top: 14px; bottom: 34px; left: calc(18px + 210px + 14px); right: 18px; pointer-events: none; }
+.why-guide { position: absolute; top: 30px; bottom: 0; border-left: 1.5px dashed var(--faint); opacity: 0;
+  transform: scaleY(0); transform-origin: top; transition: transform .6s ease, opacity .3s; transition-delay: calc(var(--i, 0) * 60ms); }
+.why-guide.hit { border-color: var(--amber); }
+.s-guides .why-guide { opacity: .8; transform: scaleY(1); }
+.why-calm { position: absolute; top: 0; bottom: 0; right: 0; background: rgba(86,112,95,.13); border-left: 2px solid var(--ok); border-radius: 0 10px 10px 0;
+  opacity: 0; transition: opacity .7s; }
+.why-calm b { position: absolute; top: 6px; left: 10px; font-family: var(--mono); font-size: 10.5px; font-weight: 400; letter-spacing: .1em; text-transform: uppercase; color: #2f5a39; white-space: nowrap; }
+.s-calm .why-calm { opacity: 1; }
+/* months */
+.why-axis .why-track { height: 30px; border-top: 1px solid var(--hair); }
+.why-axis span { position: absolute; top: 7px; font-family: var(--mono); font-size: 10.5px; color: var(--muted); padding-left: 4px; border-left: 1px solid var(--hair); line-height: 1; }
+/* controls */
+.why-ctrl { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 18px; }
+.why-pips { display: flex; gap: 8px; }
+.why-pips button { width: 9px; height: 9px; padding: 0; border: 0; border-radius: 50%; background: var(--hair); cursor: pointer; transition: background .3s, transform .3s; }
+.why-pips button.on { background: var(--ink); }
+.why-pips button:hover { transform: scale(1.3); }
+.why-ctrl .btn:disabled { opacity: .35; pointer-events: none; }
+@media (max-width: 700px) {
+  .why-cap { font-size: 19px; }
+  .why-chart { grid-template-columns: 96px 1fr; padding: 12px 12px 6px; column-gap: 10px; }
+  .why-over { left: calc(12px + 96px + 10px); right: 12px; }
+  .why-lbl .hs-thumb { display: none; }
+  .why-lbl { font-size: 12.5px; }
+}
+@media (min-width: 761px) { .sheet.wide { width: min(1040px, 94vw); } }
+.why-calm b { top: auto; bottom: 8px; left: auto; right: calc(100% + 10px); }
+.answer { --veil: #e9e5dc; }
+.answer .hs-thumb.past::after { display: none; }
+.why-bar em i { font-style: normal; }
+@media (max-width: 700px) { .why-bar em i, .why-calm b { display: none; } .why-bar em { left: 7px; } }

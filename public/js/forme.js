@@ -9,23 +9,9 @@ import { thumb } from './bottle.js';
 import { whyFor, whyShort } from './why.js';
 import { openSettings, initials } from './settings.js';
 import { productHelps, FAMILY_TO_ALLERGEN, allergenMatcher, matches, isWorking, WATCH_LIST, WATCH_SOURCES } from './rules.js';
+import { AREA_WORD, joinWords, plural, beforeDays, nice, words, dots, answerCard, buildAnswer } from './answer.js';
 
-const AREA_WORD = { face: 'face', scalp: 'scalp', body: 'body' };
 const AREA_KEY = { Face: 'face', 'Hair & scalp': 'scalp', Body: 'body' };
-const joinWords = (xs) => xs.length < 2 ? xs.join('') : `${xs.slice(0, -1).join(', ')} and ${xs[xs.length - 1]}`;
-// "all 8 of your face bad days" / "5 of your 8 face bad days"
-// "before every bad day your face had" / "before 5 of the 8 bad days your face had"
-const beforeDays = (n, total, area) => n === total
-  ? (total === 1 ? `before the one bad day your ${area} had` : total === 2 ? `before both bad days your ${area} had` : `before every bad day your ${area} had`)
-  : `before ${n} of the ${total} bad days your ${area} had`;
-// how to talk about an ingredient type: "Fragrance ... it" / "Preservatives ... they"
-const NICE = { 'Coconut-derived': 'Coconut-derived ingredients', 'Cleansers (surfactants)': 'Strong cleansers' };
-const nice = (fam) => NICE[fam] || fam;
-const isPlural = (fam) => fam !== 'Fragrance' && /s$/.test(nice(fam));
-const words = (fam) => isPlural(fam)
-  ? { it: 'they', It: 'They', was: 'were', is: 'are', has: 'have', them: 'them', its: 'they’re' }
-  : { it: 'it', It: 'It', was: 'was', is: 'is', has: 'has', them: 'it', its: 'it’s' };
-const plural = (n, one, many) => (n === 1 ? one : many);
 
 export function renderForMe(view) {
   stepNo = 0;
@@ -186,18 +172,8 @@ function ingredientCard(f, compact) {
     h('button', { class: 'chip' + (f.status === 'reject' ? ' on' : ''), onclick: () => choose('reject') }, 'No'));
 
   if (compact) return h('details', { class: 'fm-ing maybe' }, h('summary', null, top), where, ask);
-  return h('article', { class: 'fm-ing' + (likely ? ' likely' : '') }, top, where, ask);
-}
-
-// One dot per bad day, oldest first. Filled = in use the week before.
-function dots(reactions, hit) {
-  const ws = windowsFor();
-  const list = [...reactions].sort((a, b) => a.date.localeCompare(b.date));
-  return h('div', { class: 'fm-dots', 'aria-hidden': 'true' }, list.map((r, idx) => {
-    const w = ws.find((x) => x.reaction.id === r.id);
-    const on = w && hit(w);
-    return h('span', { class: 'fm-dot' + (on ? ' on' : ''), style: `--i:${idx}`, title: `${fmtDate(r.date)}: ${on ? 'in use the week before' : 'not in use'}` });
-  }));
+  if (likely) return answerCard(buildAnswer(f), { variant: 'full', extra: [where, ask] });
+  return h('article', { class: 'fm-ing' }, top, where, ask);
 }
 
 // ---------- try to avoid ----------

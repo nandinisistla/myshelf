@@ -3,12 +3,13 @@ import { verdict, productAllergens, productHelps, isWorking } from './rules.js';
 import { h, put, toast, confirmSheet, openSheet, fmtDate, howLong, daysBetween, AREAS, compressImage } from './ui.js';
 import { store, mutate, S, onChange, findPhotos } from './store.js';
 import { renderBottle, rankImages, imageSrc, scoreImage } from './bottle.js';
+import { answerCard, buildAnswer, isLikely } from './answer.js';
 
 const AREA_WORD = { face: 'face', scalp: 'scalp', body: 'body' };
 const listWords = (xs) => xs.length < 2 ? xs.join('') : `${xs.slice(0, -1).join(', ')} and ${xs[xs.length - 1]}`;
 
 // Two or three plain sentences: is it working for you, what it helps with, anything to watch.
-function summaryLines(p, { fine, susFamilies, allergensIn, helps }) {
+function summaryLines(p, { fine, susFamilies, covered, allergensIn, helps }) {
   const st = store.state;
   const area = AREA_WORD[p.area];
   const out = [];
@@ -17,16 +18,18 @@ function summaryLines(p, { fine, susFamilies, allergensIn, helps }) {
     const calm = susFamilies.length && after === 0 && daysBetween(p.stopped, st.today) >= 14;
     out.push(['', `You used this from ${fmtDate(p.started)} to ${fmtDate(p.stopped)}.`]);
     if (susFamilies.length) out.push(['warn', `It has ${listWords(susFamilies.map((f) => f.toLowerCase()))}, which was probably bothering your ${area}.`]);
-    if (calm) out.push(['ok', `✓ Your ${area} has been fine since you stopped.`]);
+    if (calm && !covered) out.push(['ok', `✓ Your ${area} has been fine since you stopped.`]);
   } else if (susFamilies.length) {
     out.push(['warn', `It has ${listWords(susFamilies.map((f) => f.toLowerCase()))}, which may be what’s bothering your ${area}.`]);
+  } else if (covered) {
+    // the answer card below says it
   } else if (fine) {
     out.push(['ok', `✓ This works for you. You’ve used it for ${howLong(p.started, st.today)} with no bad days.`]);
   } else {
     out.push(['', `You started this ${p.started === st.today ? 'today' : `${howLong(p.started, st.today)} ago`}. After two weeks with no bad days, MyShelf will mark it safe.`]);
   }
   if (helps.size && !p.stopped) out.push(['', `It helps with your ${listWords([...helps.keys()].map((x) => x.toLowerCase()))}.`]);
-  if (allergensIn.length && !susFamilies.length) {
+  if (allergensIn.length && !susFamilies.length && !covered) {
     out.push(fine
       ? ['', `It has ${listWords(allergensIn.map((x) => x.toLowerCase()))}, which you avoid, but your ${area} is fine with it.`]
       : ['warn', `It has ${listWords(allergensIn.map((x) => x.toLowerCase()))}, which is on your allergen list.`]);
@@ -56,6 +59,10 @@ export function openProduct(prod) {
     // From your skin profile: allergens in it, and which of your skin problems it helps.
     const allergensIn = productAllergens(p);
     const helps = productHelps(p);
+    // If this product is part of your pattern, show the same answer card as For me.
+    const fam = st.insights.families.find((f) => isLikely(f) && (f.areaProductIds || f.productIds).includes(p.id));
+    const ans = fam ? buildAnswer(fam) : null;
+    const covered = new Set(ans ? ans.names : []);
 
 
     const routineSel = h('select', { class: 'input', 'aria-label': 'Shelf', onchange: (e) => save({ routine_id: e.target.value ? Number(e.target.value) : null }, 'Moved') },
@@ -118,7 +125,8 @@ export function openProduct(prod) {
         h('div', { class: 'p-tile' }, h('span', { class: 'floor', 'aria-hidden': 'true' }), renderBottle(p, { big: true, showName: false })),
         h('div', { class: 'p-name' }, p.name),
         h('div', { class: 'p-meta' }, [p.brand, AREAS[p.area]].filter(Boolean).join(' · ')),
-        h('div', { class: 'p-lines' }, summaryLines(p, { fine, susFamilies, allergensIn, helps }))),
+        h('div', { class: 'p-lines' }, summaryLines(p, { fine, susFamilies: susFamilies.filter((x) => !covered.has(x)), covered: covered.size > 0, allergensIn, helps }))),
+      ans ? answerCard(ans, { variant: 'product' }) : null,
       lowRes,
       controls,
       h('div', { class: 'easier' }, h('h3', null, 'What’s inside'),

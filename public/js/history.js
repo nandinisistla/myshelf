@@ -4,6 +4,7 @@ import { h, put, fmtDate, fmtTime, localDay, addDays, daysBetween, howLong, AREA
 import { store } from './store.js';
 import { openProduct } from './product.js';
 import { openBadDay } from './reaction.js';
+import { mainAnswer, answerCard } from './answer.js';
 import { thumb } from './bottle.js';
 import { initials } from './settings.js';
 
@@ -34,23 +35,9 @@ export function renderHistory(view) {
 function headline(st) {
   const R = st.reactions;
   if (R.length < 2) return null;
-  const fam = st.insights.families.find((f) => f.status !== 'reject' && (f.status === 'agree' || f.level === 'strong'));
-  if (fam) {
-    const area = AREA_WORD[fam.area];
-    const ps = (fam.areaProductIds || []).map((id) => st.products.find((p) => p.id === id)).filter(Boolean);
-    const stillUsing = ps.some((p) => !p.stopped);
-    const lastStop = ps.map((p) => p.stopped).filter(Boolean).sort().pop();
-    const after = lastStop ? R.filter((r) => r.area === fam.area && r.date > lastStop).length : 1;
-    const calm = !stillUsing && lastStop && after === 0 && daysBetween(lastStop, st.today) >= 14;
-    const top = ps[0];
-    const when = fam.hits === fam.relevant ? `before every bad day your ${area} had` : `before ${fam.hits} of the ${fam.relevant} bad days your ${area} had`;
-    return h('button', { class: 'hs-headline', onclick: () => { location.hash = '#forme'; } },
-      top ? thumb(top, 'lg') : null,
-      h('div', null,
-        h('div', { class: 'mono' }, fam.status === 'agree' ? 'Your pattern · you confirmed it' : 'Your pattern'),
-        h('p', null, h('b', null, fam.family), ` was in something you used ${when}.`,
-          calm ? ` Since you stopped using it on ${fmtDate(lastStop)}, you’ve been doing good.` : '')));
-  }
+  // The same answer card as For me and the product page.
+  const ans = mainAnswer();
+  if (ans) return answerCard(ans, { variant: 'compact' });
   const count = new Map();
   for (const w of st.insights.windows || []) for (const id of w.productIds) count.set(id, (count.get(id) || 0) + 1);
   let best = null;
@@ -65,13 +52,15 @@ function headline(st) {
   const area = AREA_WORD[p.area];
   const after = R.filter((r) => r.area === p.area && p.stopped && r.date > p.stopped).length;
   const calm = p.stopped && after === 0 && daysBetween(p.stopped, st.today) >= 14;
-  return h('button', { class: 'hs-headline', onclick: () => openProduct(p) },
-    thumb(p, 'lg'),
-    h('div', null,
-      h('div', { class: 'mono' }, 'Pattern'),
-      h('p', null,
-        h('b', null, p.name), ` was in use before ${n === total ? 'every one' : n} of your ${total} ${area} bad days.`,
-        calm ? ` Since you stopped it on ${fmtDate(p.stopped)}, you’ve been doing good.` : '')));
+  // No clear ingredient yet: the product that keeps showing up, in the same card.
+  return h('article', { class: 'answer compact' },
+    h('div', { class: 'answer-pic' }, thumb(p, 'lg')),
+    h('div', { class: 'answer-body' },
+      h('div', { class: 'answer-top' }, h('span', { class: 'answer-label' }, 'Your pattern')),
+      h('h3', { class: 'answer-title' }, `${p.name} keeps showing up`),
+      h('p', { class: 'answer-line strong' }, `You were using it before ${n === total ? `every bad day your ${area} had` : `${n} of the ${total} bad days your ${area} had`}.`),
+      calm ? h('p', { class: 'answer-line ok' }, `✓ Since you stopped it on ${fmtDate(p.stopped)}, you’ve been doing good.`) : null,
+      h('div', { class: 'answer-actions' }, h('button', { class: 'btn small', onclick: () => openProduct(p) }, 'Open product'))));
 }
 
 function feed(st) {
