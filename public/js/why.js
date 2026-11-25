@@ -22,3 +22,28 @@ export const WHY = {
   'Deodorant actives': 'Baking soda and aluminium salts often cause underarm itching, redness or a rash.',
 };
 export const whyFor = (family) => WHY[family] || 'Not a common irritant, but any ingredient can bother some people.';
+
+// The same idea in a few words, for the compact cards.
+export const WHY_SHORT = {
+  'Fragrance': 'The #1 cause of skincare reactions',
+  'Essential oils & plant extracts': 'Natural scents that can irritate',
+  'Preservatives': 'A few are common allergens',
+  'Drying alcohol': 'Dries and irritates skin',
+  'Exfoliating acids': 'Can sting, redden and peel',
+  'Retinoids': 'Dryness and peeling at first',
+  'Vitamin C': 'Acidic, can sting',
+  'Niacinamide': 'Can flush at high strength',
+  'Azelaic acid': 'Can tingle at first',
+  'Soothing ingredients': 'Rarely a problem',
+  'Humectants': 'Rarely a problem',
+  'Oils & emollients': 'Rich ones can clog pores',
+  'Silicones': 'The film can trap oil',
+  'Sunscreen filters': 'Some can sting',
+  'Cleansers (surfactants)': 'Strong ones strip skin',
+  'Peptides': 'Rarely irritating',
+  'Antioxidants': 'Rarely irritating',
+  'Colorants': 'Added for looks; can cause allergies',
+  'Coconut-derived': 'Can clog pores',
+  'Deodorant actives': 'Can cause underarm rash',
+};
+export const whyShort = (family) => WHY_SHORT[family] || 'Not a common irritant';

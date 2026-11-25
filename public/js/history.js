@@ -24,8 +24,8 @@ export function renderHistory(view) {
       h('h1', { class: 'display' }, 'Your skin story', h('span', { class: 'soft' }, '.'))),
     headline(st),
     h('div', { class: 'hs-filter' },
-      h('button', { class: 'chip' + (onlyBad ? '' : ' on'), onclick: () => { onlyBad = false; renderHistory(view); } }, 'Everything'),
-      h('button', { class: 'chip' + (onlyBad ? ' on' : ''), onclick: () => { onlyBad = true; renderHistory(view); } }, 'Bad days only')),
+      h('button', { class: 'chip' + (onlyBad ? '' : ' on'), onclick: () => { onlyBad = false; renderHistory(view); } }, 'All'),
+      h('button', { class: 'chip' + (onlyBad ? ' on' : ''), onclick: () => { onlyBad = true; renderHistory(view); } }, h('i', { class: 'fm-dot on', 'aria-hidden': 'true' }), ' Bad days')),
     feed(st));
 }
 
@@ -43,13 +43,17 @@ function headline(st) {
     const after = lastStop ? R.filter((r) => r.area === fam.area && r.date > lastStop).length : 1;
     const calm = !stillUsing && lastStop && after === 0 && daysBetween(lastStop, st.today) >= 14;
     const top = ps[0];
-    return h('button', { class: 'hs-headline', onclick: () => { location.hash = '#forme'; } },
+    const dotsRow = h('span', { class: 'fm-dots static', 'aria-hidden': 'true' },
+      R.filter((r) => r.area === fam.area).map(() => h('i', { class: 'fm-dot on' })));
+    return h('button', { class: 'hs-headline', onclick: () => { location.hash = '#forme'; },
+      'aria-label': `${fam.family} was in what you used before ${fam.hits} of your ${fam.relevant} ${area} bad days.${calm ? ` Since ${fmtDate(lastStop)}, you’ve been doing good.` : ''}` },
       top ? thumb(top, 'lg') : null,
       h('div', null,
-        h('div', { class: 'mono' }, fam.status === 'agree' ? 'Pattern · you confirmed it' : 'Pattern'),
-        h('p', null,
-          h('b', null, fam.family), ` was in what you used before ${fam.hits === fam.relevant ? 'every one' : fam.hits} of your ${fam.relevant} ${area} bad days.`,
-          calm ? ` Since you cut it out on ${fmtDate(lastStop)}, you’ve been doing good.` : '')));
+        h('div', { class: 'mono' }, 'Pattern', fam.status === 'agree' ? ' · ✓ you confirmed it' : ''),
+        h('div', { class: 'hs-big' }, fam.family),
+        h('div', { class: 'fm-pills' },
+          h('span', { class: 'pill-s' }, dotsRow, ` ${fam.hits}/${fam.relevant} ${area} bad days`),
+          calm ? h('span', { class: 'pill-s ok' }, `✓ doing good since ${fmtDate(lastStop)}`) : null)));
   }
   const count = new Map();
   for (const w of st.insights.windows || []) for (const id of w.productIds) count.set(id, (count.get(id) || 0) + 1);
@@ -96,7 +100,7 @@ function feed(st) {
     return h('section', { class: 'hs-month' },
       h('header', null,
         h('h2', null, MONTH(m.key), ' ', h('span', { class: 'yr' }, m.key.slice(0, 4))),
-        h('span', { class: 'mono' }, bad ? `${bad} bad day${bad === 1 ? '' : 's'}` : 'No bad days')),
+        bad ? h('span', { class: 'hs-count', title: `${bad} bad day${bad === 1 ? '' : 's'}` }, Array.from({ length: bad }, () => h('i', { class: 'fm-dot on' }))) : h('span', { class: 'hs-count ok', title: 'No bad days' }, '✓')),
       m.items.map((it) => entry(it, st)));
   }));
 }
@@ -110,15 +114,15 @@ function profileItems(st) {
   for (const e of evs) {
     const d = e.data;
     const lines = [];
-    if (!prev) lines.push(`${d.skin_type || 'Skin type not set'} skin`, d.problems.length ? `Problems: ${d.problems.join(', ')}` : null, d.allergens.length ? `Avoid: ${d.allergens.join(', ')}` : null);
+    if (!prev) lines.push(d.skin_type || null, ...d.problems, ...d.allergens.map((x) => `✕ ${x}`));
     else {
       const added = (k) => d[k].filter((x) => !prev[k].includes(x));
       const removed = (k) => prev[k].filter((x) => !d[k].includes(x));
       if (d.skin_type !== prev.skin_type) lines.push(`Skin type: ${d.skin_type}`);
-      if (added('allergens').length) lines.push(`Now avoiding ${added('allergens').join(', ').toLowerCase()}`);
-      if (removed('allergens').length) lines.push(`No longer avoiding ${removed('allergens').join(', ').toLowerCase()}`);
-      if (added('problems').length) lines.push(`Added ${added('problems').join(', ').toLowerCase()}`);
-      if (removed('problems').length) lines.push(`Removed ${removed('problems').join(', ').toLowerCase()}`);
+      if (added('allergens').length) lines.push(`✕ ${added('allergens').join(', ')}`);
+      if (removed('allergens').length) lines.push(`✓ ${removed('allergens').join(', ')}`);
+      if (added('problems').length) lines.push(`+ ${added('problems').join(', ')}`);
+      if (removed('problems').length) lines.push(`− ${removed('problems').join(', ')}`);
     }
     if (prev && !lines.length) { prev = d; continue; }
     out.push({ date: localDay(e.at), kind: 'profile', order: prev ? 0.5 : 3, first: !prev, lines: lines.filter(Boolean) });
@@ -142,12 +146,12 @@ function entry(it, st) {
     return h('article', { class: `hs-row bad sev${r.severity}` }, when,
       h('span', { class: 'hs-mark', 'aria-hidden': 'true' }),
       h('div', { class: 'hs-body' },
-        h('button', { class: 'hs-title', onclick: () => openBadDay(r) },
-          `A rough day for your ${area}`, h('span', { class: 'sev' }, SEVERITY[r.severity])),
+        h('button', { class: 'hs-title', onclick: () => openBadDay(r), 'aria-label': `A rough day for your ${area}, ${SEVERITY[r.severity]}` },
+          AREAS[r.area], h('span', { class: 'sev-dots', title: SEVERITY[r.severity] }, [1, 2, 3].map((n) => h('i', { class: n <= r.severity ? 'on' : '' })))),
         r.note ? h('p', { class: 'hs-note' }, `“${r.note}”`) : null,
         h('div', { class: 'hs-used' },
-          h('div', { class: 'mono' }, used.length ? `On your ${area}, the week before` : `Nothing on your ${area} the week before`),
-          used.length ? h('div', { class: 'hs-chips' }, used.map((p) => h('button', { class: 'hs-chip', onclick: () => openProduct(p) }, thumb(p), h('span', null, p.name)))) : null)));
+          h('span', { class: 'mono' }, used.length ? 'Week before' : 'Week before: nothing'),
+          used.map((p) => h('button', { class: 'fm-thumb', title: p.name, 'aria-label': p.name, onclick: () => openProduct(p) }, thumb(p, 'lg'))))));
   }
 
   if (it.kind === 'profile' || it.kind === 'confirm') {
@@ -157,9 +161,9 @@ function entry(it, st) {
         h('span', { class: 'hs-thumb hs-icon', 'aria-hidden': 'true' }, it.kind === 'confirm' ? '✓' : initials(st.profile?.name) || '·'),
         h('div', null,
           h('div', { class: 'hs-line' }, it.kind === 'confirm'
-            ? ['You confirmed ', h('b', null, it.family.toLowerCase()), ' as a trigger']
-            : it.first ? h('b', null, 'Created your skin profile') : ['Updated your ', h('b', null, 'skin profile')]),
-          h('div', { class: 'mono' }, it.kind === 'confirm' ? 'Added to Better to avoid' : it.lines.join(' · ')))));
+            ? ['✓ Confirmed: ', h('b', null, it.family)]
+            : it.first ? h('b', null, 'Profile created') : h('b', null, 'Profile updated')),
+          h('div', { class: 'mono' }, it.kind === 'confirm' ? 'now on try to avoid' : it.lines.join(' · ')))));
   }
 
   const p = it.p;
@@ -170,9 +174,9 @@ function entry(it, st) {
     h('button', { class: 'hs-body hs-product', onclick: () => openProduct(p) },
       thumb(p),
       h('div', null,
-        h('div', { class: 'hs-line' }, stop ? 'Stopped ' : today ? 'Added ' : 'Started ', h('b', null, p.name)),
-        h('div', { class: 'mono' }, [p.brand, shelf(p) ? `${shelf(p)} shelf` : AREAS[p.area],
-          stop && p.started ? `used ${howLong(p.started, p.stopped)}` : null].filter(Boolean).join(' · ')))));
+        h('div', { class: 'hs-line' }, h('span', { class: 'verb ' + (stop ? 'no' : 'add') }, stop ? '✕' : '+'), h('b', null, p.name)),
+        h('div', { class: 'mono' }, [stop ? 'stopped' : today ? 'added' : 'started', shelf(p) || AREAS[p.area],
+          stop && p.started ? howLong(p.started, p.stopped) : null].filter(Boolean).join(' · ')))));
 }
 
 function log() {
