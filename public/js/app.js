@@ -87,17 +87,19 @@ start();
 // (or missing) get a fresh search. Never touches photos you chose or took yourself.
 async function upgradePhotos() {
   if (!store.state?.aiEnabled) return;
-  const week = 7 * 86400000;
-  const todo = [];
+  const day = 86400000, week = 7 * day;
+  const missing = [];   // no photo at all: always fetch these (past products too)
+  const small = [];     // a photo that's too small: up to 3 per visit
   for (const p of store.state.products) {
-    if (p.has_photo || p.image_locked || p.stopped) continue;
-    if (p.photo_checked && Date.now() - new Date(p.photo_checked).getTime() < week) continue;
+    if (p.has_photo || p.image_locked) continue;
+    const since = p.photo_checked ? Date.now() - new Date(p.photo_checked).getTime() : Infinity;
     const src = imageSrc(p);
-    if (!src) { todo.push(p.id); continue; }
+    if (!src) { if (since > day) missing.push(p.id); continue; }
+    if (p.stopped || since < week) continue;
     const r = await scoreImage(src);
-    if (!r.width || Math.min(r.width, r.height) < 900) todo.push(p.id);
+    if (!r.width || Math.min(r.width, r.height) < 900) small.push(p.id);
   }
-  for (const id of todo.slice(0, 3)) {
+  for (const id of [...missing, ...small.slice(0, 3)]) {
     try { await findPhotos(id, true); } catch { /* try again another day */ }
   }
 }

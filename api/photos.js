@@ -22,7 +22,9 @@ export default handler(async (req, res) => {
   if (!name) throw new UserError('Which product?');
   // Automatic upgrades: at most once a week per product, never over the user's own choice.
   if (auto && product) {
-    const recent = product.photo_checked && Date.now() - new Date(product.photo_checked).getTime() < 7 * 86400000;
+    // a product with no photo at all is retried daily; one that has a photo, weekly
+    const wait = product.image_url ? 7 * 86400000 : 86400000;
+    const recent = product.photo_checked && Date.now() - new Date(product.photo_checked).getTime() < wait;
     if (recent || product.image_locked || product.has_photo) return res.status(200).json({ images: product.image_options || [], skipped: true });
     await q(`update products set photo_checked = now() where id = $1`, [product.id]);
   }
