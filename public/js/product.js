@@ -67,7 +67,7 @@ export function openProduct(prod) {
 
     const routineSel = h('select', { class: 'input', 'aria-label': 'Shelf', onchange: (e) => save({ routine_id: e.target.value ? Number(e.target.value) : null }, 'Moved') },
       h('option', { value: '' }, 'Unsorted'),
-      st.routines.map((r) => h('option', { value: r.id, selected: r.id === p.routine_id }, r.name)));
+      S.shelfOptions(h, p.routine_id));
     const areaSel = h('select', { class: 'input', 'aria-label': 'Where you use it', onchange: (e) => save({ area: e.target.value }, 'Updated') },
       Object.entries(AREAS).map(([k, v]) => h('option', { value: k, selected: k === p.area }, v)));
     const startInput = h('input', { class: 'input', type: 'date', value: p.started || '', max: st.today, 'aria-label': 'Started using',

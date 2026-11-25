@@ -6,6 +6,8 @@ export const store = { state: null };
 
 export function onChange(fn) { listeners.add(fn); return () => listeners.delete(fn); }
 function set(state) { store.state = state; listeners.forEach((fn) => fn(state)); }
+// Redraw with the same data (e.g. after switching routine).
+export function refresh() { if (store.state) set(store.state); }
 
 async function call(path, opts = {}) {
   const res = await fetch(path, {
@@ -64,5 +66,32 @@ export const S = {
   isSuspectProduct(p) {
     const sus = this.suspectsFor(p);
     return (p.ingredients || []).some((i) => sus.has(i.family));
+  },
+
+  // ---------- routines: each holds its own shelves ----------
+  sets: () => store.state.sets || [],
+  // The routine you're looking at (remembered on this device).
+  activeSet() {
+    const sets = this.sets();
+    let id = null;
+    try { id = Number(localStorage.getItem('myshelf.set')); } catch { /* private mode */ }
+    return (sets.find((x) => x.id === id) || sets[0])?.id ?? null;
+  },
+  setActive(id) { try { localStorage.setItem('myshelf.set', String(id)); } catch { /* private mode */ } },
+  setOf(r) { return r.set_id ?? this.sets()[0]?.id ?? null; },
+  shelvesIn(setId) { return store.state.routines.filter((r) => this.setOf(r) === setId); },
+  // <option>s for a shelf picker, grouped by routine when there's more than one.
+  shelfOptions(h, selectedId) {
+    const sets = this.sets();
+    const opt = (r) => h('option', { value: r.id, selected: r.id === selectedId }, r.name);
+    if (sets.length < 2) return store.state.routines.map(opt);
+    return sets.map((x) => h('optgroup', { label: x.name }, this.shelvesIn(x.id).map(opt)));
+  },
+  // "Morning", or "Summer · Morning" once you have more than one routine.
+  shelfLabel(routineId) {
+    const r = this.routine(routineId);
+    if (!r) return null;
+    const sets = this.sets();
+    return sets.length > 1 ? `${sets.find((x) => x.id === this.setOf(r))?.name || ''} · ${r.name}` : r.name;
   },
 };

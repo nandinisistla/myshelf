@@ -7,7 +7,7 @@ import { DEMO_PRODUCTS, DEMO_REACTIONS, DEMO_PROFILE, DEMO_STATUSES, DEMO_OWN_DA
 
 export const config = { maxDuration: 60 };
 
-const SERIAL = ['routines', 'products', 'reactions', 'events', 'chat'];
+const SERIAL = ['shelf_sets', 'routines', 'products', 'reactions', 'events', 'chat'];
 
 export default handler(async (req, res) => {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Use POST' });
@@ -45,9 +45,10 @@ const at = (date, time) => `${date}T${time}:00Z`;
 
 async function demo(action, body, todayISO) {
   if (action === 'data.wipe') {
-    for (const t of ['products', 'photos', 'reactions', 'events', 'chat', 'insight_status', 'insight_cache', 'snapshots', 'profile', 'routines']) await q(`delete from ${t}`);
+    for (const t of ['products', 'photos', 'reactions', 'events', 'chat', 'insight_status', 'insight_cache', 'snapshots', 'profile', 'routines', 'shelf_sets']) await q(`delete from ${t}`);
+    const set = (await q(`insert into shelf_sets (name, position) values ('Everyday', 0) returning id`))[0].id;
     const names = ['Morning', 'Night', 'Hair', 'Body'];
-    for (let i = 0; i < names.length; i++) await q(`insert into routines (name, position) values ($1, $2)`, [names[i], i]);
+    for (let i = 0; i < names.length; i++) await q(`insert into routines (name, position, set_id) values ($1, $2, $3)`, [names[i], i, set]);
     await setFlag('demo', 'removed');   // stays empty: the demo doesn't come back by itself
     return getState(todayISO);
   }

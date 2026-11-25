@@ -1,7 +1,7 @@
 // History: your skin story as a simple diary, newest first.
 // Bad days show what you were using in the week before, so the link explains itself.
 import { h, put, fmtDate, fmtTime, localDay, addDays, daysBetween, howLong, AREAS, SEVERITY } from './ui.js';
-import { store } from './store.js';
+import { store, S } from './store.js';
 import { openProduct } from './product.js';
 import { openBadDay } from './reaction.js';
 import { mainAnswer, answerCard } from './answer.js';
@@ -127,7 +127,7 @@ function profileItems(st) {
 
 function entry(it, st) {
   const when = h('div', { class: 'hs-when' }, h('div', { class: 'd' }, it.date.slice(8, 10)), h('div', { class: 'mono' }, WEEKDAY(it.date)));
-  const shelf = (p) => st.routines.find((r) => r.id === p.routine_id)?.name;
+  const shelf = (p) => S.shelfLabel(p.routine_id);
 
   if (it.kind === 'bad') {
     const r = it.r;

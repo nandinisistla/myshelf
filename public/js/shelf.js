@@ -1,6 +1,6 @@
 // Shelf: your products as clean cards, grouped by routine (your "shelves").
 import { h, put, toast, confirmSheet, openSheet, howLong, AREAS } from './ui.js';
-import { store, mutate, S } from './store.js';
+import { store, mutate, S, refresh } from './store.js';
 import { renderBottle } from './bottle.js';
 import { openProduct } from './product.js';
 import { openAdd } from './add.js';
@@ -21,9 +21,13 @@ export function renderShelf(view) {
     tagline(),
     h('div', { style: 'display:flex;gap:10px;margin-top:22px;flex-wrap:wrap' },
       h('button', { class: 'btn primary', onclick: () => openAdd() }, 'Add a product'),
-      h('button', { class: 'btn', onclick: newShelf }, 'New shelf')));
+      h('button', { class: 'btn', onclick: newShelf }, 'New shelf'),
+      h('button', { class: 'btn', onclick: newRoutine }, 'New routine')),
+    routineBar());
 
-  const groups = st.routines.map((r, i) => group(r, i + 1, onShelf.filter((p) => p.routine_id === r.id), numberOf));
+  // Only the shelves of the routine you're looking at.
+  const shelves = S.shelvesIn(S.activeSet());
+  const groups = shelves.map((r, i) => group(r, i + 1, onShelf.filter((p) => p.routine_id === r.id), numberOf));
   const unsorted = onShelf.filter((p) => !p.routine_id || !st.routines.some((r) => r.id === p.routine_id));
   if (unsorted.length) groups.push(group({ id: null, name: 'Unsorted' }, st.routines.length + 1, unsorted, numberOf));
 
@@ -108,7 +112,7 @@ function newShelf() {
   const err = h('div', { class: 'err' });
   const save = async () => {
     if (!input.value.trim()) { err.textContent = 'Give the shelf a name.'; return; }
-    try { await mutate('routine.add', { name: input.value }); sh.close(); toast('New shelf added'); }
+    try { await mutate('routine.add', { name: input.value, setId: S.activeSet() }); sh.close(); toast('New shelf added'); }
     catch (e) { err.textContent = e.message; }
   };
   input.addEventListener('keydown', (e) => { if (e.key === 'Enter') save(); });
@@ -119,6 +123,63 @@ function newShelf() {
     foot: [h('button', { class: 'btn primary block', onclick: save }, 'Add shelf')],
   });
   setTimeout(() => input.focus(), 50);
+}
+
+// ---------- routines: Everyday, Summer, Travel… each with its own shelves ----------
+function routineBar() {
+  const sets = S.sets();
+  if (sets.length < 2) return null;
+  const active = S.activeSet();
+  const cur = sets.find((x) => x.id === active);
+  return h('div', { class: 'routine-bar' },
+    h('span', { class: 'mono' }, 'Routine'),
+    h('div', { class: 'seg routine-seg', role: 'tablist', 'aria-label': 'Routine' },
+      sets.map((x) => h('button', { class: x.id === active ? 'on' : '', role: 'tab', 'aria-selected': String(x.id === active),
+        onclick: () => { if (x.id !== active) { S.setActive(x.id); refresh(); } } }, x.name))),
+    h('button', { class: 'mono-btn', onclick: () => renameRoutine(cur) }, 'Rename'),
+    h('button', { class: 'mono-btn', onclick: () => removeRoutine(cur) }, 'Remove'));
+}
+
+function nameSheet({ title, intro, placeholder, value = '', button, onSave }) {
+  const input = h('input', { class: 'input', placeholder, maxlength: 40, value, 'aria-label': title });
+  const err = h('div', { class: 'err' });
+  const save = async () => {
+    if (!input.value.trim()) { err.textContent = 'Give it a name.'; return; }
+    try { await onSave(input.value.trim()); sh.close(); } catch (e) { err.textContent = e.message; }
+  };
+  input.addEventListener('keydown', (e) => { if (e.key === 'Enter') save(); });
+  input.addEventListener('input', () => { err.textContent = ''; });
+  const sh = openSheet({ title, body: [intro ? h('p', { class: 'muted' }, intro) : null, input, err],
+    foot: [h('button', { class: 'btn primary block', onclick: save }, button)] });
+  setTimeout(() => input.focus(), 50);
+}
+
+function newRoutine() {
+  const from = S.activeSet();
+  const names = S.shelvesIn(from).map((r) => r.name);
+  const list = names.length < 2 ? names.join('') : `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`;
+  nameSheet({
+    title: 'New routine', placeholder: 'Summer, Travel, Winter…', button: 'Make routine',
+    intro: `It gets the same shelves${list ? ` (${list})` : ''}, empty, ready for the products you use in it.`,
+    onSave: async (name) => {
+      const before = new Set(S.sets().map((x) => x.id));
+      await mutate('set.add', { name, fromId: from });
+      const made = S.sets().find((x) => !before.has(x.id));
+      if (made) { S.setActive(made.id); refresh(); }
+      toast(`${name} is ready`);
+    },
+  });
+}
+
+function renameRoutine(set) {
+  nameSheet({ title: 'Rename routine', placeholder: 'Routine name', value: set.name, button: 'Save',
+    onSave: async (name) => { await mutate('set.rename', { id: set.id, name }); toast('Renamed'); } });
+}
+
+async function removeRoutine(set) {
+  const first = S.sets().find((x) => x.id !== set.id);
+  if (!(await confirmSheet(`Remove the "${set.name}" routine? Its products move to the same shelves in ${first?.name || 'your other routine'}. Nothing is deleted.`, 'Remove routine'))) return;
+  try { await mutate('set.delete', { id: set.id }); S.setActive(first?.id); refresh(); toast('Routine removed'); } catch (e) { toast(e.message); }
 }
 
 async function removeShelf(r) {

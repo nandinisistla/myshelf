@@ -49,8 +49,11 @@ const TOOLS = [
 ];
 
 function context(state) {
-  const shelves = state.routines.map((r) => `#${r.id} ${r.name}`).join(', ') || 'none';
-  const shelfName = (id) => state.routines.find((r) => r.id === id)?.name || 'Unsorted';
+  // With more than one routine, name shelves with their routine: "Summer Morning".
+  const multi = (state.sets || []).length > 1;
+  const label = (r) => (multi ? `${state.sets.find((x) => x.id === r.set_id)?.name || ''} ${r.name}`.trim() : r.name);
+  const shelves = state.routines.map((r) => `#${r.id} ${label(r)}`).join(', ') || 'none';
+  const shelfName = (id) => { const r = state.routines.find((x) => x.id === id); return r ? label(r) : 'Unsorted'; };
   const products = state.products.map((p) => {
     const fams = [...new Set((p.ingredients || []).map((i) => i.family))].filter((f) => f !== 'Other' && f !== 'Water & base').slice(0, 10);
     return `#${p.id} ${p.brand ? p.brand + ' ' : ''}${p.name} | ${AREAS[p.area]} | shelf: ${shelfName(p.routine_id)} | started ${p.started || '?'}${p.stopped ? ` | stopped ${p.stopped}` : ' | in use'} | ${fams.join(', ') || 'no ingredient list'}`;
@@ -131,7 +134,7 @@ async function runTool(name, input, ctx) {
     }
     case 'delete_product': await core.deleteProduct(input.product_id, src); return { label: 'Product removed', result: 'Done.' };
     case 'delete_bad_day': await core.deleteReaction(input.reaction_id, src); return { label: 'Bad day deleted', result: 'Done.' };
-    case 'create_shelf': { const r = await core.addRoutine(input.name, src); return { label: `New shelf: ${r.name}`, result: `Created shelf #${r.id}.` }; }
+    case 'create_shelf': { const r = await core.addRoutine(input.name, null, src); return { label: `New shelf: ${r.name}`, result: `Created shelf #${r.id}.` }; }
     case 'rename_shelf': await core.renameRoutine(input.shelf_id, input.name, src); return { label: `Shelf renamed to ${input.name}`, result: 'Done.' };
     case 'update_profile': await core.setProfile(input, src); return { label: 'Profile updated', result: 'Done.' };
     case 'set_finding': await core.setInsightStatus(input.family, input.status, src); return { label: `Noted: ${input.family}`, result: 'Done.' };

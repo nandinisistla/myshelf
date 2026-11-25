@@ -983,3 +983,9 @@ body.dragging-card, body.dragging-card * { cursor: grabbing !important; user-sel
   .sys-stage.pills { grid-template-columns: 1fr; }
   .sys-swatch { width: 44px; height: 44px; }
 }
+
+/* ---------- routine switcher (Everyday, Summer, Travel…) ---------- */
+.routine-bar { display: flex; align-items: center; flex-wrap: wrap; gap: 10px 16px; margin-top: 26px; }
+.routine-bar > .mono { font-family: var(--mono); font-size: 10.5px; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
+.routine-seg button { white-space: nowrap; }
+@media (max-width: 560px) { .routine-bar { gap: 8px 14px; } .routine-bar > .mono { width: 100%; } }

@@ -1,6 +1,6 @@
 // Add a product: type a name, pick the match, AI finds the ingredients, you check, done.
 import { h, put, s, toast, openSheet, AREAS, todayISO, compressImage } from './ui.js';
-import { store, mutate, searchProducts, enrich } from './store.js';
+import { store, mutate, searchProducts, enrich, S } from './store.js';
 import { renderBottle, prepare, rankImages } from './bottle.js';
 import { productAllergens, productHelps, WATCH_LIST, isWorking } from './rules.js';
 
@@ -147,7 +147,7 @@ export function openAdd({ routineId = null, prefill = '' } = {}) {
       Object.entries(AREAS).map(([k, v]) => h('option', { value: k, selected: k === draft.area }, v)));
     const shelf = h('select', { class: 'input', onchange: (e) => { draft.routine_id = e.target.value ? Number(e.target.value) : null; } },
       h('option', { value: '' }, 'Unsorted'),
-      st.routines.map((r) => h('option', { value: r.id, selected: r.id === draft.routine_id }, r.name)));
+      S.shelfOptions(h, draft.routine_id));
     const started = h('input', { class: 'input', type: 'date', value: draft.started, max: st.today, oninput: (e) => { draft.started = e.target.value; } });
 
     const ings = draft.ingredients || [];
@@ -211,14 +211,14 @@ export function openAdd({ routineId = null, prefill = '' } = {}) {
             if (added) await mutate('product.photo', { id: added.id, data: draft.photo });
           }
           sh.close();
-          const shelfName = store.state.routines.find((r) => r.id === draft.routine_id)?.name;
+          const shelfName = S.shelfLabel(draft.routine_id);
           toast(`Added to ${shelfName || 'your shelf'}`);
         } catch (ex) { err.textContent = ex.message; btn.disabled = false; }
       } }, 'Add to shelf'));
   }
 
   function guessRoutine(area) {
-    const rs = store.state.routines;
+    const rs = S.shelvesIn(S.activeSet());   // the routine you're looking at
     const find = (re) => rs.find((r) => re.test(r.name))?.id;
     if (area === 'scalp') return find(/hair|scalp/i) || null;
     if (area === 'body') return find(/body|shower/i) || null;

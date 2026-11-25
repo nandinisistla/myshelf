@@ -16,7 +16,10 @@ export default handler(async (req, res) => {
     case 'reaction.add': await core.addReaction(d); break;
     case 'reaction.update': await core.updateReaction(d.id, d.patch || {}); break;
     case 'reaction.delete': await core.deleteReaction(d.id); break;
-    case 'routine.add': await core.addRoutine(d.name); break;
+    case 'routine.add': await core.addRoutine(d.name, d.setId); break;
+    case 'set.add': await core.addSet(d.name, d.fromId); break;
+    case 'set.rename': await core.renameSet(d.id, d.name); break;
+    case 'set.delete': await core.deleteSet(d.id); break;
     case 'routine.rename': await core.renameRoutine(d.id, d.name); break;
     case 'routine.delete': await core.deleteRoutine(d.id); break;
     case 'profile.set': await core.setProfile(d); break;
