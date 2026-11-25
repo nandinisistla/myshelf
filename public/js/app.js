@@ -9,6 +9,7 @@ import { openBadDay } from './reaction.js';
 import { openOnboarding, openSettings, initials } from './settings.js';
 import { findPhotos, admin } from './store.js';
 import { loadDemo } from './demo.js';
+import { startBlobs } from './blob.js';
 import { imageSrc, scoreImage } from './bottle.js';
 
 const view = document.getElementById('view');
@@ -43,6 +44,7 @@ window.addEventListener('hashchange', () => render(false));
 onChange(() => render(true));
 document.getElementById('badDayBtn').addEventListener('click', () => openBadDay());
 document.getElementById('profileBtn').addEventListener('click', () => openSettings());
+startBlobs();
 // Show your initials on the profile button once you have a name.
 onChange((st) => {
   const btn = document.getElementById('profileBtn');
