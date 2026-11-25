@@ -53,7 +53,6 @@ function card(p, numberOf) {
   const st = store.state;
   const suspect = S.isSuspectProduct(p);
   const tile = h('div', { class: 'tile' + (p.stopped ? ' stopped' : '') },
-    h('span', { class: 'corner l' }, `Nº ${pad(numberOf.get(p.id) || 0)}`),
     suspect ? h('span', { class: 'tdot', title: 'Contains a likely trigger' }) : null,
     h('span', { class: 'corner r' }, AREAS[p.area] || ''),
     h('span', { class: 'floor', 'aria-hidden': 'true' }),

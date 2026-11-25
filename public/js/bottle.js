@@ -178,9 +178,7 @@ function frontFace(p) {
 // The back of every bottle: a little note to make you smile.
 export function quoteCard(p, big = false) {
   return h('figure', { class: 'quote-card' + (big ? ' big' : '') },
-    h('div', { class: 'qc-top' }, h('span', null, 'A note for you'), h('i', { 'aria-hidden': 'true' })),
-    h('blockquote', { class: quoteFor(p.id).length > 30 ? 'long' : '' }, quoteFor(p.id)),
-    h('figcaption', null, h('span', null, 'MyShelf'), h('span', null, '♡')));
+    h('blockquote', { class: quoteFor(p.id).length > 30 ? 'long' : '' }, quoteFor(p.id)));
 }
 
 // How good is a photo for the shelf? Plain light background, product filling
