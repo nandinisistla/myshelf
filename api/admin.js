@@ -45,11 +45,15 @@ const at = (date, time) => `${date}T${time}:00Z`;
 
 async function demo(action, body, todayISO) {
   if (action === 'data.wipe') {
-    for (const t of ['products', 'photos', 'reactions', 'events', 'chat', 'insight_status', 'insight_cache', 'snapshots', 'profile', 'routines', 'shelf_sets']) await q(`delete from ${t}`);
-    const set = (await q(`insert into shelf_sets (name, position) values ('Everyday', 0) returning id`))[0].id;
-    const names = ['Morning', 'Night', 'Hair', 'Body'];
-    for (let i = 0; i < names.length; i++) await q(`insert into routines (name, position, set_id) values ($1, $2, $3)`, [names[i], i, set]);
+    await wipeAll();
     await setFlag('demo', 'removed');   // stays empty: the demo doesn't come back by itself
+    return getState(todayISO);
+  }
+
+  // Put the demo story back: clear everything, then the app loads the demo again.
+  if (action === 'demo.restore') {
+    await wipeAll();
+    await q(`delete from app_flags where key in ('demo', 'demo_fill')`);
     return getState(todayISO);
   }
 
@@ -84,8 +88,11 @@ async function demo(action, body, todayISO) {
     if (!item) throw new UserError('Unknown demo product.');
     const info = body.info && typeof body.info === 'object' ? body.info : {};
     const images = Array.isArray(info.images) ? info.images : [];
-    const routine = (await q(`select id from routines where lower(name) = lower($1) limit 1`, [item.routine]))[0];
-    const first = item.image || images[0];
+    const routine = (await q(`select r.id from routines r left join shelf_sets s on s.id = r.set_id
+                                where lower(r.name) = lower($1) order by s.position nulls first, s.id, r.id limit 1`, [item.routine]))[0];
+    let saved = null;
+    try { saved = JSON.parse((await q(`select value from app_flags where key = 'demo_photos'`))[0]?.value || '{}')[item.name] || null; } catch { /* none saved */ }
+    const first = item.image || (saved ? { url: saved.url, source: (saved.credit || '').replace(/^Image: /, '') } : null) || images[0];
     const curated = item.ingredients ? { ingredients: item.ingredients, summary: item.summary, kind: item.kind,
       confidence: 'high', ai_note: 'Ingredients from the product label.', sources: [] } : {};
     const p = await addProduct({
@@ -94,15 +101,16 @@ async function demo(action, body, todayISO) {
       routine_id: routine?.id || null, started: item.started,
       image_url: first?.url || null,
       image_credit: first ? (first.source === 'Open Beauty Facts' ? 'Photo: Open Beauty Facts (CC BY-SA)' : `Image: ${first.source}`) : null,
-      image_options: images,
+      image_options: images.length ? images : saved?.options || [],
     }, 'demo');
+    if (saved?.credit && first?.url === saved.url) await q(`update products set image_credit = $1, photo_checked = now() where id = $2`, [saved.credit, p.id]);
     await q(`update products set demo = true where id = $1`, [p.id]);
     await q(`update events set at = $1 where kind = 'product.add' and data->>'productId' = $2`, [at(item.started, '09:14'), String(p.id)]);
     if (item.stopped) {
       await stopProduct(p.id, item.stopped, todayISO, 'demo');
       await q(`update events set at = $1 where kind = 'product.stop' and data->>'productId' = $2`, [at(item.stopped, '21:40'), String(p.id)]);
     }
-    return { ...(await getState(todayISO)), demoProductId: p.id };
+    return { ...(await getState(todayISO)), demoProductId: p.id, demoHasPhoto: Boolean(first?.url) };
   }
 
   if (action === 'demo.finish') {
@@ -175,6 +183,24 @@ async function clearDemo() {
     }
     await q(`delete from events where source = 'demo' and kind in ('profile', 'insight')`);
   }
+}
+
+// Remember the demo products' photos, so a restored demo shows them straight away.
+async function savePhotos() {
+  const rows = await q(`select name, image_url, image_credit, image_options from products where demo and image_url is not null`);
+  if (!rows.length) return;
+  const old = (await q(`select value from app_flags where key = 'demo_photos'`))[0];
+  let saved = {};
+  try { saved = JSON.parse(old?.value || '{}'); } catch { /* start fresh */ }
+  for (const r of rows) saved[r.name] = { url: r.image_url, credit: r.image_credit, options: r.image_options || [] };
+  await setFlag('demo_photos', JSON.stringify(saved));
+}
+async function wipeAll() {
+  await savePhotos();
+  for (const t of ['products', 'photos', 'reactions', 'events', 'chat', 'insight_status', 'insight_cache', 'snapshots', 'profile', 'routines', 'shelf_sets']) await q(`delete from ${t}`);
+  const set = (await q(`insert into shelf_sets (name, position) values ('Everyday', 0) returning id`))[0].id;
+  const names = ['Morning', 'Night', 'Hair', 'Body'];
+  for (let i = 0; i < names.length; i++) await q(`insert into routines (name, position, set_id) values ($1, $2, $3)`, [names[i], i, set]);
 }
 
 async function setFlag(key, value) {

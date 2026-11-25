@@ -23,7 +23,11 @@ export function renderShelf(view) {
       h('button', { class: 'btn primary', onclick: () => openAdd() }, 'Add a product'),
       h('button', { class: 'btn', onclick: newShelf }, 'New shelf'),
       h('button', { class: 'btn', onclick: newRoutine }, 'New routine')),
-    routineBar());
+    routineBar(),
+    // Emptied by someone trying things out: one tap brings the demo story back.
+    st.demo === 'removed' && !st.products.length ? h('div', { class: 'callout restore-callout' },
+      h('span', null, 'MyShelf is empty.'),
+      h('button', { class: 'btn small', onclick: () => import('./settings.js').then((m) => m.runRestore()) }, 'Restore the demo')) : null);
 
   // Only the shelves of the routine you're looking at.
   const shelves = S.shelvesIn(S.activeSet());

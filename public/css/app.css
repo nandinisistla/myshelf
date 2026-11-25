@@ -989,3 +989,4 @@ body.dragging-card, body.dragging-card * { cursor: grabbing !important; user-sel
 .routine-bar > .mono { font-family: var(--mono); font-size: 10.5px; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
 .routine-seg button { white-space: nowrap; }
 @media (max-width: 560px) { .routine-bar { gap: 8px 14px; } .routine-bar > .mono { width: 100%; } }
+.restore-callout { display: flex; align-items: center; justify-content: space-between; gap: 14px; margin-top: 24px; max-width: 520px; }

@@ -36,7 +36,7 @@ export function loadDemo(key, onProgress = () => {}, fillOnly = false) {
           }
         }
         const r = await admin('demo.product', key, { index: item.index, info });
-        if (item.curated && r.demoProductId) { try { await findPhotos(r.demoProductId, true); } catch { /* photo can be found later */ } }
+        if (item.curated && r.demoProductId && !r.demoHasPhoto) { try { await findPhotos(r.demoProductId, true); } catch { /* photo can be found later */ } }
       }
     };
     await Promise.all([worker(), worker(), worker()]);
@@ -50,3 +50,10 @@ export const clearDemo = (key) => admin('demo.clear', key);
 
 // Add any demo products that never loaded, without touching anything else.
 export const fillDemo = () => loadDemo('', () => {}, true);
+
+// "Restore the demo": clear MyShelf and load the demo story again. The demo's photos are
+// remembered, so it's back in a few seconds.
+export async function restoreDemo(onProgress = () => {}) {
+  await admin('demo.restore', '');
+  await loadDemo('', onProgress);
+}

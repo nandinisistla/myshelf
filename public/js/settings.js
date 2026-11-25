@@ -67,7 +67,9 @@ export function openOnboarding() {
   const form = profileForm(() => sh.close(), true);
   sh = openSheet({
     title: 'Welcome to MyShelf',
-    body: form.body,
+    body: [store.state.demo === 'removed' ? h('div', { class: 'callout', style: 'display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:18px' },
+        h('span', null, 'Just looking around? See MyShelf with a full demo story.'),
+        h('button', { class: 'btn small', onclick: () => { sh.close(); runRestore(); } }, 'Restore the demo')) : null, ...form.body],
     foot: [h('button', { class: 'btn block', onclick: () => sh.close() }, 'Skip'), h('button', { class: 'btn primary block', onclick: form.save }, 'Save')],
   });
 }
@@ -86,12 +88,28 @@ export function openSettings() {
       h('p', { class: 'muted small' }, 'MyShelf uses Claude to find ingredient lists, explain them in plain words and run the chat. The pattern counts themselves are plain math, so they’re exact. Everything the AI adds is labelled and editable.'),
       h('p', { class: 'muted small' }, store.state.aiEnabled ? 'AI is on.' : 'AI is off: add ANTHROPIC_API_KEY in Vercel to turn it on.'),
       h('div', { class: 'section-h' }, 'Your data'),
-      h('p', { class: 'muted small' }, 'Removes every product, bad day, photo, chat and your profile, and starts MyShelf empty. This can’t be undone.'),
+      h('p', { class: 'muted small' }, 'Restore the demo puts back Nandini’s demo story, exactly as it started. Remove all data starts MyShelf empty.'),
       err,
+      h('div', { style: 'display:flex;gap:10px;flex-wrap:wrap' },
+      h('button', { class: 'btn small', onclick: async () => {
+        if (!(await confirmSheet('Restore the demo? Everything on MyShelf now is replaced with the demo story.', 'Restore the demo'))) return;
+        sh.close();
+        await runRestore();
+      } }, 'Restore the demo'),
       h('button', { class: 'btn small danger', onclick: async () => {
         if (!(await confirmSheet('Remove all data from MyShelf? Every product, bad day, photo, chat and your profile will be deleted. This can’t be undone.', 'Remove all data', true))) return;
         try { await admin('data.wipe', ''); sh.close(); toast('All data removed'); } catch (e) { err.textContent = e.message; }
-      } }, 'Remove all data'),
+      } }, 'Remove all data')),
     ],
   });
+}
+
+// Shared by Settings, the welcome screen and the empty shelf.
+export async function runRestore() {
+  toast('Bringing back the demo…');
+  try {
+    const { restoreDemo } = await import('./demo.js');
+    await restoreDemo();
+    toast('The demo is back');
+  } catch (e) { toast(e.message); }
 }
