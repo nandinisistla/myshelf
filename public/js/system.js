@@ -19,7 +19,7 @@ export function renderSystem(view) {
   put(view,
     h('section', { class: 'page-head' },
       h('h1', { class: 'display' }, 'Components', h('span', { class: 'soft' }, '.')),
-      h('p', { class: 'lede' }, 'The parts MyShelf is built from. Each one below is the real, working part, made once and used across the app.')),
+      h('p', { class: 'lede' }, 'The parts MyShelf is built from.')),
 
     part('Product tile', 'Shows one product. Drag it to spin, tap to open.', ['Shelf'],
       [inUse && variant('In use', productCard(inUse)),
