@@ -288,3 +288,15 @@ export function renderBottle(p, { big = false, onOpen, showName = true } = {}) {
   el.addEventListener('contextmenu', (e) => e.preventDefault());
   return el;
 }
+
+// A small product picture, blended onto the page like on the shelf.
+export function thumb(p, size = '') {
+  const box = h('span', { class: 'hs-thumb ' + size + (p.stopped ? ' past' : '') });
+  const src = imageSrc(p);
+  if (!src) { box.append(drawBottle(p)); return box; }
+  prepare(src).then(({ url, blend }) => {
+    box.classList.toggle('blend', blend);
+    box.append(h('img', { src: url, alt: '', draggable: 'false' }));
+  });
+  return box;
+}

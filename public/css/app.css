@@ -527,3 +527,54 @@ button.rail-item:hover:not(.on) .n { text-decoration: underline; text-underline-
   .hs-row::before { left: 52px; }
   .hs-headline p { font-size: 18px; }
 }
+
+/* ---------- for me ---------- */
+.fm-step { margin-top: 40px; }
+.fm-step-head { display: flex; align-items: baseline; gap: 14px; border-bottom: 1px solid var(--rule); padding-bottom: 10px; margin-bottom: 18px; }
+.fm-step-head .mono { font-size: 12px; color: var(--muted); letter-spacing: .1em; }
+.fm-step-head h2 { margin: 0; font-size: 28px; font-weight: 400; letter-spacing: -.01em; }
+.fm-intro { color: var(--muted); margin: -4px 0 18px; max-width: 640px; }
+.fm-prods { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 14px; }
+.fm-prod { display: flex; gap: 18px; align-items: center; text-align: left; border: 1px solid var(--hair); background: var(--paper-2); border-radius: 16px; padding: 18px 20px; cursor: pointer; font: inherit; color: inherit; }
+.fm-prod:hover { border-color: var(--rule); }
+.fm-prod .nm { font-size: 18px; line-height: 1.25; }
+.fm-count { font-size: 15px; margin-top: 6px; }
+.fm-status { font-family: var(--mono); font-size: 10.5px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); margin-top: 8px; }
+.fm-status.live { color: var(--amber-ink); }
+.fm-dots { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 8px; }
+.fm-dot { width: 11px; height: 11px; border-radius: 50%; border: 1.5px solid var(--amber); }
+.fm-dot.on { background: var(--amber); }
+.fm-ings { display: grid; gap: 14px; }
+.fm-ing { border: 1px solid var(--hair); border-radius: 16px; padding: 20px 24px; background: var(--paper); }
+.fm-ing.likely { border-color: var(--amber); background: rgba(192,138,46,.06); }
+.fm-ing-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.fm-ing h3 { margin: 0; font-size: 22px; font-weight: 400; }
+.fm-badge { font-family: var(--mono); font-size: 10.5px; letter-spacing: .1em; text-transform: uppercase; border: 1px solid var(--rule); border-radius: 999px; padding: 4px 10px; color: var(--muted); white-space: nowrap; }
+.fm-badge.on { background: var(--amber); border-color: var(--amber); color: #fff; }
+.fm-why { margin: 10px 0 0; font-size: 16px; line-height: 1.45; max-width: 720px; }
+.fm-ai { margin: 8px 0 0; color: var(--muted); font-size: 14.5px; max-width: 720px; }
+.fm-where { margin-top: 14px; }
+.fm-where .mono { font-size: 10.5px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.fm-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+.fm-tip { margin: 14px 0 0; font-size: 14.5px; color: var(--amber-ink); }
+.fm-ask { display: flex; align-items: center; gap: 8px; margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--hair); font-size: 14.5px; color: var(--muted); }
+.fm-ask span { margin-right: 4px; }
+.fm-safe { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; }
+.fm-safe-item { display: flex; flex-direction: column; align-items: center; gap: 10px; border: 1px solid var(--hair); background: var(--paper-2); border-radius: 14px; padding: 16px 12px; cursor: pointer; font: inherit; font-size: 14px; color: inherit; text-align: center; line-height: 1.25; }
+.fm-safe-item:hover { border-color: var(--rule); }
+.fm-leftovers { margin-top: 36px; font-size: 14.5px; }
+.fm-leftovers p { margin: 0 0 10px; }
+.fm-empty { border: 1px dashed var(--rule); border-radius: 16px; padding: 30px; max-width: 620px; }
+.fm-empty h3 { margin: 0 0 8px; font-weight: 400; font-size: 22px; }
+.fm-sub { font-size: 10.5px; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); margin: 26px 0 10px; }
+.fm-ing.maybe { padding: 0; }
+.fm-ing.maybe > summary { list-style: none; cursor: pointer; padding: 16px 24px; }
+.fm-ing.maybe > summary::-webkit-details-marker { display: none; }
+.fm-ing.maybe > summary .fm-why { font-size: 15px; color: var(--muted); }
+.fm-ing.maybe > summary h3 { font-size: 19px; }
+.fm-ing.maybe[open] > summary { padding-bottom: 0; }
+.fm-ing.maybe > :not(summary) { margin-left: 24px; margin-right: 24px; }
+.fm-ing.maybe > .fm-ask { margin-bottom: 18px; }
+.fm-ing.maybe:hover { border-color: var(--rule); }
+.fm-ings + .fm-ings { margin-top: 0; }
+.fm-ings.compact { gap: 10px; }

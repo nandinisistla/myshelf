@@ -1,134 +1,188 @@
-// For me: what works for your skin and what might not.
-// The counts are exact (code). The AI writes the explanation. You decide.
-import { h, put, s, toast, AREAS } from './ui.js';
+// For me: what your skin is telling you, in three plain steps.
+// 1) which products were in use before your bad days, 2) what they have in common,
+// 3) what's been safe. The counts are exact (code); the AI only adds a short note.
+import { h, put, toast, fmtDate, daysBetween } from './ui.js';
 import { store, mutate, refreshInsights, S } from './store.js';
 import { openProduct } from './product.js';
 import { openBadDay } from './reaction.js';
+import { thumb } from './bottle.js';
 
 let askedFor = '';
-
-const LEVEL = {
-  strong: ['Strong suspect', 'amber'], possible: ['Possible', 'amber'], unlikely: ['Unlikely', ''],
-  'too-common': ['Too common to tell', ''], fine: ['Seems fine', 'ok'], 'not-enough': ['Not enough data', ''],
-};
-const WHO = { ai: 'AI suggested', agree: 'You agreed', reject: 'You said: not this', unsure: 'You’re not sure' };
+const AREA_WORD = { face: 'face', scalp: 'scalp', body: 'body' };
+const AREA_KEY = { Face: 'face', 'Hair & scalp': 'scalp', Body: 'body' };
+const joinWords = (xs) => xs.length < 2 ? xs.join('') : `${xs.slice(0, -1).join(', ')} and ${xs[xs.length - 1]}`;
 
 export function renderForMe(view) {
   const st = store.state;
   const ins = st.insights;
-  const head = [
-    h('div', { class: 'top' }, h('h1', { class: 'title' }, 'What works for me')),
-    h('p', { class: 'sub' }, `Based on ${ins.reactionCount} bad day${ins.reactionCount === 1 ? '' : 's'} and ${ins.productCount} product${ins.productCount === 1 ? '' : 's'}. I compare what you used in the ${ins.windowDays} days before each bad day.`),
-  ];
+  const head = h('section', { class: 'page-head' },
+    h('div', { class: 'eyebrow mono' }, `For me · ${ins.reactionCount} bad day${ins.reactionCount === 1 ? '' : 's'} · ${ins.productCount} products`),
+    h('h1', { class: 'display' }, 'What your skin is telling you', h('span', { class: 'soft' }, '.')),
+    h('p', { class: 'lede' }, 'For every bad day, MyShelf checks what you used on that area the week before. Whatever keeps showing up is worth a closer look.'));
 
   if (ins.reactionCount < 2) {
-    put(view, ...head, h('div', { class: 'empty' },
-      dotsArt(),
-      h('h3', null, ins.reactionCount ? 'One more bad day and I can start' : 'Nothing to connect yet'),
-      h('p', null, 'When your skin, scalp or body acts up, log it. After 2 or more, I connect the dots between your products, ingredients and those days.'),
-      h('button', { class: 'btn primary', onclick: () => openBadDay() }, "Log a bad day")),
-    fineSection(), disclaimer());
+    put(view, head, h('div', { class: 'fm-empty' },
+      h('h3', null, ins.reactionCount ? 'One more bad day and the dots start connecting' : 'Nothing to connect yet'),
+      h('p', null, 'When your skin, scalp or body acts up, log it. After two, MyShelf starts comparing what you used before each one.'),
+      h('button', { class: 'btn primary', onclick: () => openBadDay() }, 'Log a bad day')),
+    safeSection(), disclaimer());
     return;
   }
 
-  // Ask the AI to write fresh explanations when the pattern changed.
-  const worth = ins.families.some((f) => ['strong', 'possible', 'too-common'].includes(f.level));
+  // Ask the AI for fresh short notes when the pattern changed.
+  const worth = ins.families.some((f) => ['strong', 'possible'].includes(f.level));
   if (st.aiEnabled && worth && !ins.explanationsFresh && askedFor !== ins.signature) {
     askedFor = ins.signature;
     refreshInsights().catch(() => {});
   }
 
-  const suspects = ins.families.filter((f) => f.status === 'agree' || ['strong', 'possible'].includes(f.level));
-  const rejected = ins.families.filter((f) => f.status === 'reject' && !['strong', 'possible'].includes(f.level));
-  const common = ins.families.filter((f) => f.level === 'too-common');
-
-  put(view, ...head,
-    network(),
-    ins.overall ? h('p', { class: 'callout' }, ins.overall) : null,
-    h('div', { class: 'section-h' }, suspects.length ? 'Possible triggers' : 'Possible triggers'),
-    suspects.length ? suspects.map(card) : h('p', { class: 'muted' }, 'No clear pattern yet. That’s good news, or it needs a few more bad days to show.'),
-    rejected.length ? [h('div', { class: 'section-h' }, 'You ruled out'), rejected.map(card)] : null,
-    fineSection(),
-    common.length ? [h('div', { class: 'section-h' }, 'Too common to tell'),
-      h('p', { class: 'muted small' }, `${common.map((f) => f.family).join(', ')}: in almost everything you use, so they can’t be separated from the rest.`)] : null,
-    h('div', { style: 'margin-top:18px' }, h('button', { class: 'btn small', onclick: async (e) => {
-      e.currentTarget.disabled = true;
-      try { askedFor = ''; await refreshInsights(); toast('Re-checked'); } catch (err) { toast(err.message); }
-    } }, 'Ask AI to re-check')),
-    disclaimer());
+  put(view, head, productsSection(), ingredientsSection(), safeSection(), leftovers(), disclaimer());
 }
 
-function card(f) {
+// ---------- 1. products in use before bad days ----------
+function windowsFor() { return store.state.insights.windows || []; }
+
+function productsSection() {
   const st = store.state;
-  const [label, tone] = LEVEL[f.level] || ['', ''];
+  const count = new Map();
+  for (const w of windowsFor()) for (const id of w.productIds) count.set(id, (count.get(id) || 0) + 1);
+  const list = st.products.map((p) => {
+    const total = st.reactions.filter((r) => r.area === p.area).length;
+    return { p, n: count.get(p.id) || 0, total };
+  }).filter((x) => x.n >= 2 && x.n / x.total >= 0.6).sort((a, b) => b.n - a.n || b.n / b.total - a.n / a.total);
+
+  return h('section', { class: 'fm-step' },
+    stepHead('1', 'Products in use before your bad days'),
+    list.length
+      ? h('div', { class: 'fm-prods' }, list.map(({ p, n, total }) => {
+          const area = AREA_WORD[p.area];
+          const after = p.stopped ? st.reactions.filter((r) => r.area === p.area && r.date > p.stopped).length : 0;
+          const status = p.stopped
+            ? (after === 0 && daysBetween(p.stopped, st.today) >= 14 ? `Stopped ${fmtDate(p.stopped)}. No ${area} bad days since.` : `Stopped ${fmtDate(p.stopped)}.`)
+            : 'Still on your shelf.';
+          return h('button', { class: 'fm-prod', onclick: () => openProduct(p) },
+            thumb(p, 'lg'),
+            h('div', { class: 'fm-prod-txt' },
+              h('div', { class: 'nm' }, p.name),
+              h('div', { class: 'fm-count' }, `Before ${n === total ? `all ${total}` : `${n} of ${total}`} ${area} bad days`),
+              dots(st.reactions.filter((r) => r.area === p.area), (w) => w.productIds.includes(p.id)),
+              h('div', { class: 'fm-status' + (p.stopped ? '' : ' live') }, status)));
+        }))
+      : h('p', { class: 'muted' }, 'No single product lines up with your bad days yet. That’s good news, or it needs a few more bad days to show.'));
+}
+
+// ---------- 2. what they have in common ----------
+function ingredientsSection() {
+  const st = store.state;
+  const ins = st.insights;
+  const sus = ins.families.filter((f) => f.status !== 'reject' && (f.status === 'agree' || ['strong', 'possible'].includes(f.level)))
+    .sort((a, b) => rank(a) - rank(b) || b.hits / b.relevant - a.hits / a.relevant || a.fineWith - b.fineWith);
+  if (!sus.length) return null;
+  const shown = new Set();
+  return h('section', { class: 'fm-step' },
+    stepHead('2', 'What those products have in common'),
+    h('p', { class: 'fm-intro' }, 'Each dot is one bad day. A filled dot means this ingredient type was in something you used the week before.'),
+    (() => {
+      const cards = sus.filter((f) => {
+        // Ingredients that always come together are shown as one card.
+        if (shown.has(f.family)) return false;
+        (f.together || []).forEach((g) => shown.add(g));
+        shown.add(f.family);
+        return true;
+      });
+      const likely = cards.filter((f) => f.status === 'agree' || f.level === 'strong');
+      const maybe = cards.filter((f) => !likely.includes(f));
+      return [
+        likely.length ? h('div', { class: 'fm-ings' }, likely.map((f) => ingredientCard(f, false))) : null,
+        maybe.length ? h('div', { class: 'fm-sub mono' }, likely.length ? 'Less clear · tap one to see why' : 'Nothing clear yet · tap one to see why') : null,
+        maybe.length ? h('div', { class: 'fm-ings' }, maybe.map((f) => ingredientCard(f, true))) : null,
+      ];
+    })());
+}
+const rank = (f) => (f.status === 'agree' ? 0 : f.level === 'strong' ? 1 : 2);
+
+function ingredientCard(f, compact) {
+  const st = store.state;
   const prods = f.productIds.map((id) => S.product(id)).filter(Boolean);
+  const fineIds = new Set(st.insights.fineProductIds);
+  const fineOnes = prods.filter((p) => fineIds.has(p.id));
+  const live = prods.filter((p) => !p.stopped);
+  const areaKeys = f.areas.map((a) => AREA_KEY[a] || a);
+  const areaWords = joinWords(areaKeys.map((a) => AREA_WORD[a] || a));
+  const likely = f.status === 'agree' || f.level === 'strong';
+  const names = [f.family, ...(f.together || [])];
+
+  const why = [`In use before ${f.hits === f.relevant ? `all ${f.relevant}` : `${f.hits} of ${f.relevant}`} of your ${areaWords} bad days`];
+  if (fineOnes.length) why.push(`, but it’s also in ${joinWords(fineOnes.map((p) => p.name))}, which ${fineOnes.length > 1 ? 'have' : 'has'} been fine for you.`);
+  else why.push(f.hits === f.relevant ? ', and in nothing that’s been fine for you.' : '.');
+
   const choose = async (status) => {
     try { await mutate('insight.status', { family: f.family, status: f.status === status ? 'ai' : status }); }
     catch (e) { toast(e.message); }
   };
-  return h('article', { class: 'finding' + (f.status !== 'reject' && tone === 'amber' ? ' amber' : '') },
-    h('div', { class: 'fh' }, h('div', { class: 'fn' }, f.family), h('span', { class: 'pill ' + (f.status === 'reject' ? '' : tone) }, f.status === 'reject' ? 'Ruled out' : label)),
-    h('ul', { class: 'ev' },
-      h('li', null, 'Before ', h('b', null, `${f.hits} of ${f.relevant}`), ` bad days (${f.areas.join(', ').toLowerCase()})`),
-      h('li', null, 'In ', h('b', null, `${f.fineWith} of ${f.fineTotal}`), ' products that were fine'),
-      h('li', null, 'Found in: ', prods.map((p, i) => [i ? ', ' : '', h('button', { class: 'link', style: 'color:inherit', onclick: () => openProduct(p) }, p.name)]))),
-    f.together && f.together.length ? h('div', { class: 'muted small', style: 'margin-top:6px' },
-      `Always comes with ${f.together.join(', ').toLowerCase()} in the same products, so they can’t be told apart yet.`) : null,
-    f.explanation ? h('div', { class: 'ex' }, f.explanation) : null,
-    h('div', { class: 'who' }, WHO[f.status] || 'AI suggested', f.status === 'ai' && f.aiWritten ? ' · explanation written by AI' : ''),
-    h('div', { class: 'choices', role: 'group', 'aria-label': `Your view on ${f.family}` },
-      h('button', { class: 'chip' + (f.status === 'agree' ? ' on' : ''), onclick: () => choose('agree') }, 'Agree'),
-      h('button', { class: 'chip' + (f.status === 'reject' ? ' on' : ''), onclick: () => choose('reject') }, 'Not this'),
-      h('button', { class: 'chip' + (f.status === 'unsure' ? ' on' : ''), onclick: () => choose('unsure') }, 'Not sure')));
+
+  const top = [
+    h('div', { class: 'fm-ing-head' },
+      h('h3', null, joinWords(names)),
+      h('span', { class: 'fm-badge' + (likely ? ' on' : '') }, f.status === 'agree' ? 'You said yes' : likely ? 'Likely' : 'Maybe')),
+    dots(st.reactions.filter((r) => areaKeys.includes(r.area)), (w) => w.productIds.some((id) => f.productIds.includes(id))),
+    h('p', { class: 'fm-why' }, why.join(''))];
+  const rest = [
+    names.length > 1 ? h('p', { class: 'fm-why muted' }, `These always come in the same products, so they can’t be told apart yet.`) : null,
+    f.aiWritten && f.explanation ? h('p', { class: 'fm-ai' }, f.explanation) : null,
+    h('div', { class: 'fm-where' },
+      h('div', { class: 'mono' }, live.length ? 'Still on your shelf in' : 'Was in'),
+      h('div', { class: 'fm-chips' }, (live.length ? live : prods).map((p) => h('button', { class: 'hs-chip', onclick: () => openProduct(p) }, thumb(p), h('span', null, p.name))))),
+    likely && live.length
+      ? h('p', { class: 'fm-tip' }, `Want to be sure? Skip ${live.length > 1 ? 'these' : 'it'} for two weeks and log any bad days. If they stop, you have your answer.`)
+      : null,
+    h('div', { class: 'fm-ask' },
+      h('span', null, 'Sound right to you?'),
+      h('button', { class: 'chip' + (f.status === 'agree' ? ' on' : ''), onclick: () => choose('agree') }, 'Yes'),
+      h('button', { class: 'chip' + (f.status === 'reject' ? ' on' : ''), onclick: () => choose('reject') }, 'No'))];
+  if (compact) return h('details', { class: 'fm-ing maybe' }, h('summary', null, top), rest);
+  return h('article', { class: 'fm-ing' + (likely ? ' likely' : '') }, top, rest);
 }
 
-function fineSection() {
+// One dot per bad day, oldest first. Filled = this was in use the week before it.
+function dots(reactions, hit) {
+  const ws = windowsFor();
+  const list = [...reactions].sort((a, b) => a.date.localeCompare(b.date));
+  return h('div', { class: 'fm-dots', 'aria-hidden': 'true' }, list.map((r) => {
+    const w = ws.find((x) => x.reaction.id === r.id);
+    const on = w && hit(w);
+    return h('span', { class: 'fm-dot' + (on ? ' on' : ''), title: `${fmtDate(r.date)}: ${on ? 'in use the week before' : 'not in use'}` });
+  }));
+}
+
+// ---------- 3. safe so far ----------
+function safeSection() {
   const st = store.state;
   const fine = st.insights.fineProductIds.map((id) => S.product(id)).filter(Boolean);
   if (!fine.length) return null;
-  return [h('div', { class: 'section-h' }, 'Seems fine for you'),
-    h('p', { class: 'muted small', style: 'margin-top:-4px' }, 'Used for 2+ weeks with no bad day after.'),
-    h('div', { class: 'fine-list' }, fine.map((p) => h('button', { class: 'chip', onclick: () => openProduct(p) }, p.name)))];
+  return h('section', { class: 'fm-step' },
+    stepHead('3', 'Safe for you so far'),
+    h('p', { class: 'fm-intro' }, 'Used for at least two weeks, with no bad day on that area while you were using them.'),
+    h('div', { class: 'fm-safe' }, fine.map((p) => h('button', { class: 'fm-safe-item', onclick: () => openProduct(p) },
+      thumb(p, 'lg'), h('span', null, p.name)))));
 }
+
+function leftovers() {
+  const ins = store.state.insights;
+  const ruled = ins.families.filter((f) => f.status === 'reject');
+  const common = ins.families.filter((f) => f.level === 'too-common');
+  return h('div', { class: 'fm-leftovers' },
+    ruled.length ? h('p', null, h('b', null, 'You ruled out: '), ruled.map((f, i) => [i ? ', ' : '',
+      h('button', { class: 'link', onclick: () => mutate('insight.status', { family: f.family, status: 'ai' }) }, f.family)]), h('span', { class: 'muted' }, ' (tap to undo)')) : null,
+    common.length ? h('p', { class: 'muted' }, `${joinWords(common.map((f) => f.family))} ${common.length > 1 ? 'are' : 'is'} in almost everything you use, so ${common.length > 1 ? 'they' : 'it'} can’t be blamed or cleared.`) : null,
+    h('button', { class: 'btn small', onclick: async (e) => {
+      e.currentTarget.disabled = true;
+      try { askedFor = ''; await refreshInsights(); toast('Re-checked'); } catch (err) { toast(err.message); }
+    } }, 'Ask AI to re-check'));
+}
+
+const stepHead = (n, text) => h('div', { class: 'fm-step-head' }, h('span', { class: 'mono' }, n.padStart(2, '0')), h('h2', null, text));
 
 function disclaimer() {
   return h('p', { class: 'disclaimer' }, 'These are patterns, not a diagnosis. For allergies, a dermatologist can do a patch test to confirm.');
-}
-
-// Products on the left, ingredient families on the right. Suspects glow amber.
-function network() {
-  const st = store.state;
-  const ins = st.insights;
-  const sus = new Set(ins.suspectFamilies);
-  const fams = ins.families
-    .filter((f) => f.level !== 'too-common' && f.level !== 'not-enough')
-    .sort((a, b) => (sus.has(b.family) - sus.has(a.family)) || b.productIds.length - a.productIds.length)
-    .slice(0, 8);
-  const prods = st.products.filter((p) => fams.some((f) => f.productIds.includes(p.id))).slice(0, 9);
-  if (!fams.length || !prods.length) return null;
-  const W = 390, rowH = 26;
-  const H = Math.max(prods.length, fams.length) * rowH + 20;
-  const py = (i) => 16 + i * ((H - 32) / Math.max(1, prods.length - 1 || 1));
-  const fy = (i) => 16 + i * ((H - 32) / Math.max(1, fams.length - 1 || 1));
-  const lines = [];
-  prods.forEach((p, i) => fams.forEach((f, j) => {
-    if (!f.productIds.includes(p.id)) return;
-    const hot = sus.has(f.family);
-    lines.push(s('path', { d: `M128 ${py(i)} C 200 ${py(i)}, 200 ${fy(j)}, 262 ${fy(j)}`, fill: 'none', stroke: hot ? '#d4a24c' : '#cfcfcf', 'stroke-width': hot ? 1.4 : 0.8, opacity: hot ? 0.9 : 0.7 }));
-  }));
-  return h('div', { class: 'net' }, s('svg', { viewBox: `0 0 ${W} ${H}`, width: '100%', role: 'img', 'aria-label': 'How your products connect to ingredient families' },
-    lines,
-    prods.map((p, i) => [s('circle', { cx: 128, cy: py(i), r: 4, fill: '#9a9a9a' }),
-      s('text', { x: 120, y: py(i) + 4, 'text-anchor': 'end', 'font-size': 12, fill: '#2b2b2b', style: 'cursor:pointer', onclick: () => openProduct(p) }, p.name.length > 18 ? p.name.slice(0, 17) + '…' : p.name)]),
-    fams.map((f, j) => {
-      const hot = sus.has(f.family);
-      return [s('circle', { cx: 262, cy: fy(j), r: hot ? 6 : 4, fill: hot ? '#d4a24c' : '#9a9a9a' }),
-        s('text', { x: 272, y: fy(j) + 4, 'font-size': 12, fill: hot ? '#8a6420' : '#6b6b6b', 'font-weight': hot ? 700 : 400 }, f.family.length > 17 ? f.family.slice(0, 16) + '…' : f.family)];
-    })));
-}
-
-function dotsArt() {
-  return s('svg', { viewBox: '0 0 120 60', width: 120, style: 'margin:0 auto', 'aria-hidden': 'true' },
-    s('path', { d: 'M15 40 L45 18 L75 38 L105 16', fill: 'none', stroke: '#cfcfcf', 'stroke-width': 1.2 }),
-    [[15, 40], [45, 18], [75, 38], [105, 16]].map(([x, y], i) => s('circle', { cx: x, cy: y, r: i === 2 ? 6 : 4, fill: i === 2 ? '#d4a24c' : '#9a9a9a' })));
 }

@@ -4,7 +4,7 @@ import { h, put, fmtDate, fmtTime, localDay, addDays, daysBetween, howLong, AREA
 import { store } from './store.js';
 import { openProduct } from './product.js';
 import { openBadDay } from './reaction.js';
-import { imageSrc, prepare, drawBottle } from './bottle.js';
+import { thumb } from './bottle.js';
 
 const AREA_WORD = { face: 'face', scalp: 'scalp', body: 'body' };
 const MONTH = (key) => new Date(key + '-15T12:00:00Z').toLocaleDateString('en-US', { month: 'long', timeZone: 'UTC' });
@@ -119,18 +119,6 @@ function entry(it, st) {
         h('div', { class: 'hs-line' }, stop ? 'Stopped ' : today ? 'Added ' : 'Started ', h('b', null, p.name)),
         h('div', { class: 'mono' }, [p.brand, shelf(p) ? `${shelf(p)} shelf` : AREAS[p.area],
           stop && p.started ? `used ${howLong(p.started, p.stopped)}` : null].filter(Boolean).join(' · ')))));
-}
-
-// A small product picture, blended onto the page like on the shelf.
-function thumb(p, size = '') {
-  const box = h('span', { class: 'hs-thumb ' + size + (p.stopped ? ' past' : '') });
-  const src = imageSrc(p);
-  if (!src) { box.append(drawBottle(p)); return box; }
-  prepare(src).then(({ url, blend }) => {
-    box.classList.toggle('blend', blend);
-    box.append(h('img', { src: url, alt: '', draggable: 'false' }));
-  });
-  return box;
 }
 
 function log() {
