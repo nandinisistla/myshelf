@@ -53,7 +53,7 @@ function productsSection() {
           const area = AREA_WORD[p.area];
           const after = p.stopped ? st.reactions.filter((r) => r.area === p.area && r.date > p.stopped).length : 0;
           const status = p.stopped
-            ? (after === 0 && daysBetween(p.stopped, st.today) >= 14 ? `Stopped ${fmtDate(p.stopped)}. No ${area} bad days since.` : `Stopped ${fmtDate(p.stopped)}.`)
+            ? (after === 0 && daysBetween(p.stopped, st.today) >= 14 ? `Stopped ${fmtDate(p.stopped)}. You’ve been doing good since.` : `Stopped ${fmtDate(p.stopped)}.`)
             : 'Still on your shelf.';
           return h('button', { class: 'fm-prod', onclick: () => openProduct(p) },
             thumb(p, 'lg'),

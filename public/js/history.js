@@ -49,7 +49,7 @@ function headline(st) {
         h('div', { class: 'mono' }, fam.status === 'agree' ? 'Pattern · you confirmed it' : 'Pattern'),
         h('p', null,
           h('b', null, fam.family), ` was in what you used before ${fam.hits === fam.relevant ? 'every one' : fam.hits} of your ${fam.relevant} ${area} bad days.`,
-          calm ? ` Since you cut it out on ${fmtDate(lastStop)}, your ${area} hasn’t acted up once.` : '')));
+          calm ? ` Since you cut it out on ${fmtDate(lastStop)}, you’ve been doing good.` : '')));
   }
   const count = new Map();
   for (const w of st.insights.windows || []) for (const id of w.productIds) count.set(id, (count.get(id) || 0) + 1);
@@ -71,7 +71,7 @@ function headline(st) {
       h('div', { class: 'mono' }, 'Pattern'),
       h('p', null,
         h('b', null, p.name), ` was in use before ${n === total ? 'every one' : n} of your ${total} ${area} bad days.`,
-        calm ? ` Since you stopped it on ${fmtDate(p.stopped)}, your ${area} hasn’t acted up once.` : '')));
+        calm ? ` Since you stopped it on ${fmtDate(p.stopped)}, you’ve been doing good.` : '')));
 }
 
 function feed(st) {
@@ -143,7 +143,7 @@ function entry(it, st) {
       h('span', { class: 'hs-mark', 'aria-hidden': 'true' }),
       h('div', { class: 'hs-body' },
         h('button', { class: 'hs-title', onclick: () => openBadDay(r) },
-          `Your ${area} acted up`, h('span', { class: 'sev' }, SEVERITY[r.severity])),
+          `A rough day for your ${area}`, h('span', { class: 'sev' }, SEVERITY[r.severity])),
         r.note ? h('p', { class: 'hs-note' }, `“${r.note}”`) : null,
         h('div', { class: 'hs-used' },
           h('div', { class: 'mono' }, used.length ? `On your ${area}, the week before` : `Nothing on your ${area} the week before`),
