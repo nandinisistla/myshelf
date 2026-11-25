@@ -27,7 +27,7 @@ export function renderShelf(view) {
   if (unsorted.length) groups.push(group({ id: null, name: 'Unsorted' }, st.routines.length + 1, unsorted, numberOf));
 
   const pastBlock = past.length ? h('details', { class: 'past-toggle' },
-    h('summary', { class: 'mono', style: 'cursor:pointer;list-style:none' }, `No longer using · ${pad(past.length)}  ↓`),
+    h('summary', { class: 'mono', style: 'cursor:pointer;list-style:none' }, 'No longer using', h('span', { class: 'arrow', 'aria-hidden': 'true' }, '↓')),
     h('div', { class: 'grid', style: 'margin-top:18px' }, past.map((p) => card(p, numberOf)))) : null;
 
   put(view, getHero(), head, groups, pastBlock);
@@ -39,7 +39,6 @@ function group(r, n, products, numberOf) {
     : h('h2', null, r.name);
   return h('section', { class: 'shelf-group', 'aria-label': `${r.name} shelf` },
     h('div', { class: 'group-head' },
-      h('span', { class: 'num' }, pad(n)),
       nameEl,
       h('span', { class: 'rule' }),
       h('span', { class: 'mono' }, `${pad(products.length)} item${products.length === 1 ? '' : 's'}`),

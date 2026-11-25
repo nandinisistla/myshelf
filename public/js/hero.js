@@ -12,8 +12,6 @@ export function getHero() {
   const canvas = h('canvas', { class: 'hero-canvas', 'aria-hidden': 'true' });
   heroEl = h('section', { class: 'hero', 'aria-label': 'MyShelf' },
     h('h1', { class: 'sr-only' }, 'MyShelf'),
-    h('div', { class: 'hero-corner l mono' }, 'Skincare, connected'),
-    h('div', { class: 'hero-corner r mono' }, '© 2026'),
     canvas);
   slideBetween();
   requestAnimationFrame(() => start(canvas));
