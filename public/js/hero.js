@@ -174,6 +174,7 @@ function start(canvas) {
 // One scroll (wheel, swipe or key) moves from the hero to the shelf like the next slide,
 // and back up again from the top of the shelf.
 let sliding = false;
+let lastWheel = 0;
 function slideBetween() {
   const nav = () => parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--nav')) || 64;
   const shelfTop = () => {
@@ -181,11 +182,19 @@ function slideBetween() {
     if (!el || !heroEl?.isConnected) return null;
     return Math.round(el.getBoundingClientRect().top + window.scrollY - nav());
   };
+  // Hold the page still while it slides, and until the trackpad's leftover momentum
+  // has died down, so it lands exactly on the next section instead of overshooting.
   const go = (top) => {
     if (sliding) return;
     sliding = true;
+    const started = performance.now();
     window.scrollTo({ top, behavior: 'smooth' });
-    setTimeout(() => { sliding = false; }, 900);
+    const release = () => {
+      const now = performance.now();
+      if (now - started > 750 && now - lastWheel > 220) { sliding = false; return; }
+      setTimeout(release, 60);
+    };
+    setTimeout(release, 300);
   };
   const decide = (down) => {
     const top = shelfTop();
@@ -196,8 +205,10 @@ function slideBetween() {
     return false;
   };
   window.addEventListener('wheel', (e) => {
-    if (Math.abs(e.deltaY) < 4 || document.querySelector('.sheet-wrap')) return;
-    if (sliding) { if (shelfTop() != null && window.scrollY < shelfTop() + 4) e.preventDefault(); return; }
+    if (document.querySelector('.sheet-wrap')) return;
+    lastWheel = performance.now();
+    if (sliding) { e.preventDefault(); return; }
+    if (Math.abs(e.deltaY) < 1) return;
     if (decide(e.deltaY > 0)) e.preventDefault();
   }, { passive: false });
   let y0 = null;
