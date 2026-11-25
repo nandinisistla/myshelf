@@ -57,7 +57,7 @@ async function demo(action, body, todayISO) {
     // tab was closed). Add just those, once at a time.
     const flag = (await q(`select value from app_flags where key = 'demo'`))[0];
     const busy = (await q(`select at from app_flags where key = 'demo_fill'`))[0];
-    if (flag?.value === 'removed' || (busy && Date.now() - new Date(busy.at).getTime() < 5 * 60000)) return { ...(await getState(todayISO)), demoTodo: [] };
+    if (flag?.value === 'removed' || (busy && Date.now() - new Date(busy.at).getTime() < 90000)) return { ...(await getState(todayISO)), demoTodo: [] };
     await setFlag('demo_fill', 'running');
     const have = await q(`select lower(name) as name, lower(coalesce(brand, '')) as brand from products`);
     const todo = DEMO_PRODUCTS.map((d, index) => ({ index, name: d.name, brand: d.brand, curated: Boolean(d.ingredients) }))
