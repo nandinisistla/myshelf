@@ -21,10 +21,7 @@ export function renderHistory(view) {
 
   put(view,
     h('section', { class: 'page-head' },
-      h('h1', { class: 'display' }, 'Your skin story', h('span', { class: 'soft' }, '.')),
-      h('p', { class: 'lede' }, R.length
-        ? `${R.length} bad day${R.length === 1 ? '' : 's'}, ${inUse} product${inUse === 1 ? '' : 's'} in use. Every bad day shows what you were using the week before.`
-        : 'Every product you start or stop shows up here. Log a bad day and you’ll see what you were using the week before.')),
+      h('h1', { class: 'display' }, 'Your skin story', h('span', { class: 'soft' }, '.'))),
     headline(st),
     h('div', { class: 'hs-filter' },
       h('button', { class: 'chip' + (onlyBad ? '' : ' on'), onclick: () => { onlyBad = false; renderHistory(view); } }, 'Everything'),
