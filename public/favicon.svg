@@ -1,22 +1,35 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
   <defs>
-    <!-- The same see-through gooey blob as MyShelf's pill buttons: two drops melting together,
-         a soft fill, a thin ink rim and a white shine along the top. -->
+    <!-- The gooey blob from MyShelf's pill buttons, made glossy: a drop melting into a pill. -->
     <filter id="goo" x="-25%" y="-25%" width="150%" height="150%" color-interpolation-filters="sRGB">
       <feGaussianBlur in="SourceGraphic" stdDeviation="3" result="blur"/>
-      <feColorMatrix in="blur" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 22 -9" result="goo"/>
-      <feMorphology in="goo" operator="erode" radius="2.2" result="inner"/>
-      <feComposite in="goo" in2="inner" operator="out" result="rim"/>
-      <feFlood flood-color="#e4e3de"/><feComposite in2="goo" operator="in" result="fill"/>
-      <feFlood flood-color="#161615"/><feComposite in2="rim" operator="in" result="edge"/>
-      <feOffset in="inner" dx="0" dy="2.6" result="down"/>
-      <feComposite in="inner" in2="down" operator="out" result="top"/>
-      <feFlood flood-color="#ffffff"/><feComposite in2="top" operator="in" result="shine"/>
-      <feMerge><feMergeNode in="fill"/><feMergeNode in="edge"/><feMergeNode in="shine"/></feMerge>
+      <feColorMatrix in="blur" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 22 -9"/>
     </filter>
+    <filter id="soft" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="1.2"/></filter>
+    <mask id="shape" maskUnits="userSpaceOnUse" x="0" y="0" width="64" height="64">
+      <g filter="url(#goo)" fill="#fff">
+        <rect x="3" y="25" width="46" height="32" rx="16"/>
+        <circle cx="47" cy="19" r="10"/>
+      </g>
+    </mask>
+    <linearGradient id="body" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#f4f3ef"/>
+      <stop offset=".55" stop-color="#c9c7c1"/>
+      <stop offset="1" stop-color="#8f8d87"/>
+    </linearGradient>
+    <radialGradient id="depth" cx=".35" cy=".3" r=".8">
+      <stop offset=".45" stop-color="#000" stop-opacity="0"/>
+      <stop offset="1" stop-color="#2a2925" stop-opacity=".35"/>
+    </radialGradient>
   </defs>
-  <g filter="url(#goo)" fill="#000">
-    <rect x="3" y="25" width="46" height="32" rx="16"/>
-    <circle cx="47" cy="19" r="10"/>
+  <g mask="url(#shape)">
+    <rect width="64" height="64" fill="url(#body)"/>
+    <rect width="64" height="64" fill="url(#depth)"/>
+    <!-- shine -->
+    <ellipse cx="17" cy="33" rx="11" ry="4" transform="rotate(-10 17 33)" fill="#fff" opacity=".95" filter="url(#soft)"/>
+    <ellipse cx="44" cy="14.5" rx="4.2" ry="2.4" transform="rotate(-25 44 14.5)" fill="#fff" opacity=".95" filter="url(#soft)"/>
+    <circle cx="9" cy="38" r="1.6" fill="#fff" opacity=".9"/>
+    <!-- light caught along the bottom edge -->
+    <ellipse cx="27" cy="55" rx="15" ry="2.2" fill="#fff" opacity=".35" filter="url(#soft)"/>
   </g>
 </svg>
