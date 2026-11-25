@@ -6,7 +6,7 @@ import { openProduct } from './product.js';
 import { openAdd } from './add.js';
 import { getHero } from './hero.js';
 import { loadDemo, demoState, onDemoProgress } from './demo.js';
-import { productAllergens, productHelps } from './rules.js';
+import { productAllergens, productHelps, isWorking } from './rules.js';
 
 const pad = (n) => String(n).padStart(2, '0');
 
@@ -77,7 +77,7 @@ function card(p, numberOf) {
 
 // From your skin profile: what it helps with, and anything on your avoid list.
 function tags(p) {
-  const al = productAllergens(p);
+  const al = isWorking(p) ? [] : productAllergens(p);
   const helps = [...productHelps(p).keys()];
   if (!al.length && !helps.length) return null;
   return h('div', { class: 'ptags' },

@@ -2,7 +2,7 @@
 import { h, put, s, toast, openSheet, AREAS, todayISO, compressImage } from './ui.js';
 import { store, mutate, searchProducts, enrich } from './store.js';
 import { renderBottle, prepare, rankImages } from './bottle.js';
-import { productAllergens, productHelps } from './rules.js';
+import { productAllergens, productHelps, WATCH_LIST, isWorking } from './rules.js';
 
 export function openAdd({ routineId = null, prefill = '' } = {}) {
   const sh = openSheet({ title: 'Add a product', body: [], foot: [], full: true });
@@ -166,8 +166,17 @@ export function openAdd({ routineId = null, prefill = '' } = {}) {
       const fake = { area: draft.area, ingredients: ings };
       const al = productAllergens(fake);
       const helps = [...productHelps(fake).keys()];
+      // For a face product, also check what dermatologists flag for redness-prone skin,
+      // skipping anything a product that works for you already contains.
+      const probs = store.state.profile?.problems || [];
+      const sensitive = probs.some((x) => ['Redness', 'Sensitivity', 'Itchy skin'].includes(x));
+      const working = store.state.products.filter((p) => p.area === 'face' && !p.stopped && isWorking(p));
+      const watch = sensitive && draft.area === 'face'
+        ? WATCH_LIST.filter((w) => ings.some(w.test) && !working.some((p) => (p.ingredients || []).some(w.test))).map((w) => w.label.toLowerCase())
+        : [];
       return [
         al.length ? h('div', { class: 'callout' }, h('b', null, 'Heads up: '), `contains ${al.join(' and ').toLowerCase()}, which is on your avoid list.`) : null,
+        watch.length ? h('div', { class: 'callout' }, h('b', null, 'Worth knowing: '), `contains ${watch.join(' and ')}, which dermatologists say often bothers redness-prone skin.`) : null,
         helps.length ? h('div', { class: 'callout ok' }, `Good for your ${helps.map((x) => x.toLowerCase()).join(' and ')}.`) : null,
       ];
     };

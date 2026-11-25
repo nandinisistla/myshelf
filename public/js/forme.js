@@ -8,7 +8,7 @@ import { openBadDay } from './reaction.js';
 import { thumb } from './bottle.js';
 import { whyFor } from './why.js';
 import { openSettings, initials } from './settings.js';
-import { productHelps, ALLERGEN_MATCH, FAMILY_TO_ALLERGEN, allergenMatcher, matches } from './rules.js';
+import { productHelps, FAMILY_TO_ALLERGEN, allergenMatcher, matches, isWorking, WATCH_LIST, WATCH_SOURCES } from './rules.js';
 
 const AREA_WORD = { face: 'face', scalp: 'scalp', body: 'body' };
 const AREA_KEY = { Face: 'face', 'Hair & scalp': 'scalp', Body: 'body' };
@@ -198,9 +198,7 @@ function avoidSection() {
   const st = store.state;
   const ins = st.insights;
   const items = new Map();
-  for (const a of st.profile?.allergens || []) {
-    items.set(a, { label: a, match: allergenMatcher(a), listed: true, finding: null });
-  }
+  for (const a of st.profile?.allergens || []) items.set(a, { label: a, match: allergenMatcher(a), listed: true, finding: null });
   for (const f of ins.families) {
     if (f.status === 'reject' || !(f.status === 'agree' || f.level === 'strong')) continue;
     const key = FAMILY_TO_ALLERGEN[f.family] || f.family;
@@ -208,32 +206,63 @@ function avoidSection() {
     it.finding = f;
     items.set(key, it);
   }
-  if (!items.size) return null;
+  const probs = st.profile?.problems || [];
+  const sensitive = probs.some((p) => ['Redness', 'Sensitivity', 'Itchy skin'].includes(p));
+  if (!items.size && !sensitive) return null;
 
-  const has = (p, m) => (p.ingredients || []).some((i) => matches(i, m));
-  const fineIds = new Set(ins.fineProductIds);
+  const contains = (p, test) => (p.ingredients || []).some(test);
+  const chip = (p) => h('button', { class: 'hs-chip', onclick: () => openProduct(p) }, thumb(p), h('span', null, p.name));
+
+  // A. What's bothering you (your allergens and confirmed triggers)
+  const bothering = [...items.values()].map((it) => {
+    const f = it.finding;
+    const test = (i) => matches(i, it.match);
+    const withIt = st.products.filter((p) => contains(p, test));
+    const area = f ? f.area : null;
+    const stillIn = withIt.filter((p) => !p.stopped && !isWorking(p) && (!area || p.area === area));
+    const working = withIt.filter((p) => !p.stopped && isWorking(p));
+    const past = withIt.filter((p) => p.stopped && (!area || p.area === area));
+    const where = area ? `your ${AREA_WORD[area]}` : 'you';
+    return h('article', { class: 'fm-avoid-item' },
+      h('div', { class: 'fm-avoid-head' }, h('h3', null, area ? `${it.label} on ${where}` : it.label), h('span', { class: 'fm-badge on' }, 'Avoid')),
+      h('p', { class: 'fm-why' }, [
+        f ? `Before ${f.hits === f.relevant ? `all ${f.relevant}` : `${f.hits} of ${f.relevant}`} of your ${AREA_WORD[area]} bad days.` : null,
+        f?.status === 'agree' ? 'You confirmed it.' : null,
+        it.listed ? 'It’s on your allergen list.' : null].filter(Boolean).join(' ')),
+      stillIn.length
+        ? h('div', { class: 'fm-where' }, h('div', { class: 'mono warn' }, 'Still in, and worth stopping'), h('div', { class: 'fm-chips' }, stillIn.map(chip)))
+        : h('p', { class: 'fm-clear' }, `Nothing ${area ? `you use on ${where}` : 'on your shelf'} has it any more.`),
+      past.length ? h('p', { class: 'fm-why muted' }, `Was in ${joinWords(past.map((p) => p.name))}, which you stopped.`) : null,
+      working.length ? h('p', { class: 'fm-why muted' }, `Your ${joinWords([...new Set(working.map((p) => AREA_WORD[p.area]))])} ${new Set(working.map((p) => p.area)).size > 1 ? 'are' : 'is'} fine with it in ${joinWords(working.map((p) => p.name))}, so keep ${working.length > 1 ? 'those' : 'it'}.`) : null);
+  });
+
+  // B. What dermatologists say to watch for, minus anything your skin has already cleared.
+  let watch = null;
+  if (sensitive) {
+    const face = st.products.filter((p) => p.area === 'face');
+    const cleared = [];
+    const rows = [];
+    for (const w of WATCH_LIST) {
+      const inWorking = face.filter((p) => !p.stopped && isWorking(p) && contains(p, w.test));
+      if (inWorking.length) { cleared.push(`${w.label.toLowerCase()} (in ${joinWords(inWorking.map((p) => p.name))})`); continue; }
+      const past = face.filter((p) => p.stopped && contains(p, w.test));
+      const newish = face.filter((p) => !p.stopped && !isWorking(p) && contains(p, w.test));
+      rows.push(h('li', null, h('b', null, w.label), ' ', h('span', { class: 'muted' }, w.why),
+        past.length ? h('span', { class: 'fm-note' }, ` Was in ${joinWords(past.map((p) => p.name))}, which you stopped.`) : null,
+        newish.length ? h('span', { class: 'fm-note warn' }, ` In ${joinWords(newish.map((p) => p.name))}: keep an eye on it.`) : null));
+    }
+    watch = h('div', { class: 'fm-watch' },
+      h('h3', null, 'Watch for in new face products'),
+      h('p', { class: 'fm-why muted' }, `Dermatologists say these often bother skin with ${joinWords(probs.filter((p) => ['Redness', 'Sensitivity', 'Itchy skin'].includes(p)).map((x) => x.toLowerCase()))}. MyShelf warns you when you add a product with one.`),
+      h('ul', null, rows),
+      cleared.length ? h('p', { class: 'fm-clear' }, `On these lists but fine for you: ${joinWords(cleared)}. Your skin has already answered that one.`) : null,
+      h('p', { class: 'fm-src' }, 'Sources: ', WATCH_SOURCES.map((x, n) => [n ? ' · ' : '', h('a', { href: x.url, target: '_blank', rel: 'noopener' }, x.title)])));
+  }
+
   return h('section', { class: 'fm-step' },
-    stepHead('3', 'Better to avoid'),
-    h('p', { class: 'fm-intro' }, 'From the allergens in your profile and what your skin has shown. MyShelf flags these when you add something new.'),
-    h('div', { class: 'fm-avoid' }, [...items.values()].map((it) => {
-      const f = it.finding;
-      const live = st.products.filter((p) => !p.stopped && has(p, it.match));
-      const reasons = [
-        it.listed ? 'You listed it as an allergen.' : null,
-        f ? `Before ${f.hits === f.relevant ? `all ${f.relevant}` : `${f.hits} of ${f.relevant}`} of your ${AREA_WORD[f.area]} bad days${f.status === 'agree' ? ', and you confirmed it' : ''}.` : null,
-      ].filter(Boolean).join(' ');
-      // Products for other areas that have been fine with it are worth keeping.
-      const ok = live.filter((p) => f && p.area !== f.area && fineIds.has(p.id));
-      const watch = live.filter((p) => !ok.includes(p));
-      return h('article', { class: 'fm-avoid-item' },
-        h('div', { class: 'fm-avoid-head' }, h('h3', null, it.label), h('span', { class: 'fm-badge on' }, 'Avoid')),
-        h('p', { class: 'fm-why' }, reasons, ' ', h('span', { class: 'muted' }, whyFor(it.match.family || it.label))),
-        watch.length
-          ? h('div', { class: 'fm-where' }, h('div', { class: 'mono warn' }, f ? `Still on your ${AREA_WORD[f.area]} shelf` : 'Still on your shelf'),
-              h('div', { class: 'fm-chips' }, watch.map((p) => h('button', { class: 'hs-chip', onclick: () => openProduct(p) }, thumb(p), h('span', null, p.name)))))
-          : h('p', { class: 'fm-clear' }, f ? `Nothing you use on your ${AREA_WORD[f.area]} has it any more.` : 'Nothing on your shelf has it.'),
-        ok.length ? h('p', { class: 'fm-why muted' }, `It’s also in ${joinWords(ok.map((p) => p.name))}, but your ${joinWords([...new Set(ok.map((p) => AREA_WORD[p.area]))])} ${new Set(ok.map((p) => p.area)).size > 1 ? 'have' : 'has'} been fine with ${ok.length > 1 ? 'them' : 'it'}, so no need to swap.`) : null);
-    })));
+    stepHead('', 'Better to avoid'),
+    bothering.length ? h('div', { class: 'fm-avoid' }, bothering) : null,
+    watch);
 }
 
 // ---------- your profile, at the top ----------

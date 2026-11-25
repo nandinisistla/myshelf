@@ -632,3 +632,12 @@ button.rail-item:hover:not(.on) .n { text-decoration: underline; text-underline-
 .fm-look .mono { font-size: 10px; letter-spacing: .1em; text-transform: uppercase; color: var(--faint); margin-right: 4px; }
 .hs-thumb.hs-icon { background: var(--ink); color: var(--paper); border-radius: 50%; font-size: 14px; letter-spacing: .04em; width: 40px; height: 40px; margin: 2px; }
 .hs-row.profile .hs-mark { background: var(--ink); border-color: var(--ink); }
+.fm-watch { margin-top: 18px; border: 1px solid var(--hair); border-radius: 16px; padding: 20px 24px; background: var(--paper); }
+.fm-watch h3 { margin: 0; font-size: 21px; font-weight: 400; }
+.fm-watch ul { margin: 14px 0 0; padding: 0; list-style: none; display: grid; gap: 10px; }
+.fm-watch li { font-size: 15px; line-height: 1.45; padding-left: 16px; position: relative; }
+.fm-watch li::before { content: ""; position: absolute; left: 0; top: .6em; width: 6px; height: 6px; border-radius: 50%; border: 1.5px solid var(--amber); }
+.fm-note { color: var(--ink); }
+.fm-note.warn { color: var(--amber-ink); }
+.fm-src { margin: 14px 0 0; font-size: 12.5px; color: var(--muted); }
+.fm-src a { color: inherit; }

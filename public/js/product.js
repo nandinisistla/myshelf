@@ -1,5 +1,5 @@
 // Product page: the bottle, when you used it, and every ingredient in plain words.
-import { verdict, productAllergens, productHelps } from './rules.js';
+import { verdict, productAllergens, productHelps, isWorking } from './rules.js';
 import { h, put, toast, confirmSheet, openSheet, fmtDate, howLong, AREAS, compressImage } from './ui.js';
 import { store, mutate, S, onChange, findPhotos } from './store.js';
 import { renderBottle, rankImages, imageSrc, scoreImage } from './bottle.js';
@@ -97,7 +97,7 @@ export function openProduct(prod) {
         h('div', { class: 'p-status' }, status,
           fine ? h('span', { class: 'pill ok' }, 'Seems fine for you') : null,
           [...helps.keys()].slice(0, 2).map((pr) => h('span', { class: 'pill ok' }, `Helps with ${pr.toLowerCase()}`)),
-          allergensIn.map((a) => h('span', { class: 'pill amber' }, `Has ${a.toLowerCase()}`)),
+          fine ? null : allergensIn.map((a) => h('span', { class: 'pill amber' }, `Has ${a.toLowerCase()}`)),
           susFamilies.length ? h('span', { class: 'pill amber' }, 'Has a possible trigger') : null)),
       lowRes,
       controls,
@@ -106,8 +106,8 @@ export function openProduct(prod) {
           h('button', { class: mode === 'plain' ? 'on' : '', onclick: () => { mode = 'plain'; render(); } }, 'Plain words'),
           h('button', { class: mode === 'label' ? 'on' : '', onclick: () => { mode = 'label'; render(); } }, 'Label'))),
       p.summary ? h('p', { class: 'summary' }, p.summary) : null,
-      allergensIn.length ? h('div', { class: 'callout' }, `Contains ${allergensIn.join(' and ').toLowerCase()}, which is on your avoid list.`,
-        fine ? ` Your ${p.area === 'scalp' ? 'scalp' : p.area} has been fine with this product so far, so there’s no need to swap it.` : p.stopped ? '' : ' Worth finding a version without it.') : null,
+      allergensIn.length && fine ? h('div', { class: 'callout ok' }, `Has ${allergensIn.join(' and ').toLowerCase()}, which is on your avoid list, but your ${p.area} has been fine with this product. It’s working for you, so keep it.`) : null,
+      allergensIn.length && !fine ? h('div', { class: 'callout' }, `Contains ${allergensIn.join(' and ').toLowerCase()}, which is on your avoid list.${p.stopped ? '' : ' Keep an eye on how your skin reacts, or look for a version without it.'}`) : null,
       helps.size ? h('div', { class: 'callout ok' }, [...helps].map(([pr, ings]) => `Helps with ${pr.toLowerCase()} (${ings.join(', ').toLowerCase()}).`).join(' ')) : null,
       susFamilies.length ? h('div', { class: 'callout' }, `Contains ${susFamilies.slice(0, 2).join(' and ').toLowerCase()}${susFamilies.length > 2 ? ` (+${susFamilies.length - 2} more)` : ''}, which keeps showing up before your bad days. See “For me” for the evidence.`) : null,
       list.length ? ingList : h('div', { class: 'ai-note' }, 'No ingredient list yet. Tap “Edit list” to paste one.'),

@@ -59,9 +59,16 @@ export function allergenOf(i) {
   return allergens().find((a) => matches(i, allergenMatcher(a))) || null;
 }
 
+// A product is "working" when you've used it for 2+ weeks with no bad day on that area.
+// If it's working, nothing in it gets flagged: your skin has already answered the question.
+export const isWorking = (p) => (store.state?.insights?.fineProductIds || []).includes(p.id);
+
 // One verdict per ingredient, from your profile. Falls back to the AI's flag.
 export function verdict(i, p) {
   const al = allergenOf(i);
+  if ((al || worseFor(i, p.area).length) && isWorking(p)) {
+    return { flag: 'neutral', note: `${al ? `${al} is on your avoid list` : 'Can bother some skin like yours'}, but your ${p.area} has been fine with this product, so it’s working for you.` };
+  }
   if (al) return { flag: 'avoid', note: `${al} is on your avoid list.` };
   const worse = worseFor(i, p.area);
   if (worse.length) return { flag: 'watch', note: `Can make ${lower(worse)} worse.` };
@@ -89,3 +96,28 @@ const lower = (xs) => {
   const w = xs.map((x) => x.toLowerCase());
   return w.length < 2 ? w.join('') : `${w.slice(0, -1).join(', ')} and ${w[w.length - 1]}`;
 };
+
+// What dermatologists say to avoid on the face when you're prone to redness or
+// sensitivity (AAD, National Rosacea Society). Used for "Watch for in new products".
+export const WATCH_LIST = [
+  { label: 'Drying alcohol', test: (i) => i.family === 'Drying alcohol' || /^(alcohol|alcohol denat\.?|sd alcohol.*|ethanol|isopropyl alcohol)$/i.test(i.inci.trim()),
+    why: 'Dries out and irritates redness-prone skin. In a National Rosacea Society survey, 66% said alcohol irritated their skin.' },
+  { label: 'Witch hazel', test: (i) => /hamamelis|witch hazel/i.test(`${i.inci} ${i.plain}`),
+    why: 'An astringent often found in toners. People with redness-prone skin often report it as a trigger.' },
+  { label: 'Menthol, peppermint and eucalyptus', test: (i) => /menthol|menthyl|mentha piperita|peppermint|eucalyptus/i.test(`${i.inci} ${i.plain}`),
+    why: 'They create a cooling tingle, but that tingle is irritation. Common triggers for redness.' },
+  { label: 'Camphor', test: (i) => /camphor/i.test(i.inci),
+    why: 'A cooling ingredient that dermatologists say to keep off redness-prone skin.' },
+  { label: 'Glycolic and lactic acid', test: (i) => /glycolic|lactic acid/i.test(i.inci),
+    why: 'Strong exfoliating acids that can sting and redden sensitive skin.' },
+  { label: 'Sodium lauryl sulfate', test: (i) => /sodium lauryl sulfate/i.test(i.inci),
+    why: 'A harsh foaming cleanser that strips the skin’s barrier.' },
+  { label: 'Urea', test: (i) => /^urea$/i.test(i.inci.trim()),
+    why: 'Helps dry skin elsewhere, but dermatologists list it as an irritant for redness-prone faces.' },
+  { label: 'Propylene glycol', test: (i) => /^propylene glycol$/i.test(i.inci.trim()),
+    why: 'Can dry or irritate very sensitive skin.' },
+];
+export const WATCH_SOURCES = [
+  { title: 'AAD: Rosacea skin care tips', url: 'https://www.aad.org/public/diseases/rosacea/triggers/tips' },
+  { title: 'WebMD: Rosacea skin care tips', url: 'https://www.webmd.com/skin-problems-and-treatments/features/rosacea-skin-care-tips' },
+];
