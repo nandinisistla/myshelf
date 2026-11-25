@@ -282,14 +282,12 @@ function safeSection() {
 }
 
 function leftovers() {
-  const ins = store.state.insights;
-  const ruled = ins.families.filter((f) => f.status === 'reject');
-  const common = ins.families.filter((f) => f.level === 'too-common');
-  if (!ruled.length && !common.length) return null;
+  // Ingredient types you said "No" to, with a way to undo.
+  const ruled = store.state.insights.families.filter((f) => f.status === 'reject');
+  if (!ruled.length) return null;
   return h('div', { class: 'fm-leftovers' },
-    ruled.length ? h('p', null, h('b', null, 'You ruled out: '), ruled.map((f, i) => [i ? ', ' : '',
-      h('button', { class: 'link', title: 'Tap to undo', onclick: () => mutate('insight.status', { family: f.family, status: 'ai' }) }, f.family)])) : null,
-    common.length ? h('p', { class: 'muted' }, `${joinWords(common.map((f) => f.family))} ${plural(common.length, 'is', 'are')} in almost everything you use, so ${plural(common.length, 'it', 'they')} can’t be blamed or cleared.`) : null);
+    h('p', null, 'You said these aren’t the cause: ', ruled.map((f, i) => [i ? ', ' : '',
+      h('button', { class: 'link', title: 'Tap to undo', onclick: () => mutate('insight.status', { family: f.family, status: 'ai' }) }, nice(f.family))]), '. Tap one to undo.'));
 }
 
 let stepNo = 0;
