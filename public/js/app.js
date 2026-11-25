@@ -7,7 +7,7 @@ import { renderForMe } from './forme.js';
 import { renderChat, leaveChat } from './chat.js';
 import { openBadDay } from './reaction.js';
 import { openOnboarding, openSettings, initials } from './settings.js';
-import { findPhotos } from './store.js';
+import { findPhotos, admin } from './store.js';
 import { loadDemo } from './demo.js';
 import { imageSrc, scoreImage } from './bottle.js';
 
@@ -59,7 +59,9 @@ async function start() {
   try {
     await load();
     // A fresh MyShelf starts with Nandini's demo story already on it.
-    if (!store.state.demo && !store.state.reactions.length) {
+    if (store.state.demoOutdated) {
+      admin('demo.reset', '').then(() => loadDemo('', () => {})).then(() => upgradePhotos()).catch(() => {});
+    } else if (!store.state.demo && !store.state.reactions.length) {
       loadDemo('', () => {}).then(() => upgradePhotos()).catch(() => {});
     } else {
       if (!store.state.profile) openOnboarding();

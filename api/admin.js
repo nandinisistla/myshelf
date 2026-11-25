@@ -128,7 +128,26 @@ async function demo(action, body, todayISO) {
     return getState(todayISO);
   }
 
+  if (action === 'demo.reset') {
+    // An older version of the demo is on MyShelf: swap it for the current story (once).
+    const flag = (await q(`select value, at from app_flags where key = 'demo'`))[0];
+    if (flag?.value === 'removed') return getState(todayISO);
+    if (flag?.value === 'seeding' && Date.now() - new Date(flag.at).getTime() < 5 * 60000) return getState(todayISO);
+    await clearDemo();
+    await q(`delete from insight_status`);
+    await q(`delete from app_flags where key = 'demo'`);
+    return getState(todayISO);
+  }
+
   if (action === 'demo.clear') {
+    await clearDemo();
+    return getState(todayISO);
+  }
+  throw new UserError('Unknown action.');
+}
+
+async function clearDemo() {
+  {
     const prods = (await q(`select id from products where demo = true`)).map((r) => String(r.id));
     const reacts = (await q(`select id from reactions where demo = true`)).map((r) => String(r.id));
     if (prods.length) {
@@ -141,9 +160,7 @@ async function demo(action, body, todayISO) {
       await q(`delete from reactions where demo = true`);
     }
     await q(`delete from events where source = 'demo' and kind in ('profile', 'insight')`);
-    return getState(todayISO);
   }
-  throw new UserError('Unknown action.');
 }
 
 async function setFlag(key, value) {
