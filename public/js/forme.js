@@ -2,12 +2,12 @@
 // 1) which products were in use before your bad days, 2) what they have in common,
 // 3) what's been safe. The counts are exact (code); the AI only adds a short note.
 import { h, put, toast, fmtDate, daysBetween } from './ui.js';
-import { store, mutate, refreshInsights, S } from './store.js';
+import { store, mutate, S } from './store.js';
 import { openProduct } from './product.js';
 import { openBadDay } from './reaction.js';
 import { thumb } from './bottle.js';
+import { whyFor } from './why.js';
 
-let askedFor = '';
 const AREA_WORD = { face: 'face', scalp: 'scalp', body: 'body' };
 const AREA_KEY = { Face: 'face', 'Hair & scalp': 'scalp', Body: 'body' };
 const joinWords = (xs) => xs.length < 2 ? xs.join('') : `${xs.slice(0, -1).join(', ')} and ${xs[xs.length - 1]}`;
@@ -18,7 +18,7 @@ export function renderForMe(view) {
   const head = h('section', { class: 'page-head' },
     h('div', { class: 'eyebrow mono' }, `For me · ${ins.reactionCount} bad day${ins.reactionCount === 1 ? '' : 's'} · ${ins.productCount} products`),
     h('h1', { class: 'display' }, 'What your skin is telling you', h('span', { class: 'soft' }, '.')),
-    h('p', { class: 'lede' }, 'For every bad day, MyShelf checks what you used on that area the week before. Whatever keeps showing up is worth a closer look.'));
+    h('p', { class: 'lede' }, 'Each bad day is checked against what you used the week before.'));
 
   if (ins.reactionCount < 2) {
     put(view, head, h('div', { class: 'fm-empty' },
@@ -27,13 +27,6 @@ export function renderForMe(view) {
       h('button', { class: 'btn primary', onclick: () => openBadDay() }, 'Log a bad day')),
     safeSection(), disclaimer());
     return;
-  }
-
-  // Ask the AI for fresh short notes when the pattern changed.
-  const worth = ins.families.some((f) => ['strong', 'possible'].includes(f.level));
-  if (st.aiEnabled && worth && !ins.explanationsFresh && askedFor !== ins.signature) {
-    askedFor = ins.signature;
-    refreshInsights().catch(() => {});
   }
 
   put(view, head, productsSection(), ingredientsSection(), safeSection(), leftovers(), disclaimer());
@@ -80,8 +73,7 @@ function ingredientsSection() {
   if (!sus.length) return null;
   const shown = new Set();
   return h('section', { class: 'fm-step' },
-    stepHead('2', 'What those products have in common'),
-    h('p', { class: 'fm-intro' }, 'Each dot is one bad day. A filled dot means this ingredient type was in something you used the week before.'),
+    stepHead('2', 'What might be causing it'),
     (() => {
       const cards = sus.filter((f) => {
         // Ingredients that always come together are shown as one card.
@@ -94,7 +86,7 @@ function ingredientsSection() {
       const maybe = cards.filter((f) => !likely.includes(f));
       return [
         likely.length ? h('div', { class: 'fm-ings' }, likely.map((f) => ingredientCard(f, false))) : null,
-        maybe.length ? h('div', { class: 'fm-sub mono' }, likely.length ? 'Less clear · tap one to see why' : 'Nothing clear yet · tap one to see why') : null,
+        maybe.length ? h('div', { class: 'fm-sub mono' }, likely.length ? 'Less likely · tap to open' : 'Nothing clear yet · tap to open') : null,
         maybe.length ? h('div', { class: 'fm-ings' }, maybe.map((f) => ingredientCard(f, true))) : null,
       ];
     })());
@@ -112,10 +104,13 @@ function ingredientCard(f, compact) {
   const likely = f.status === 'agree' || f.level === 'strong';
   const names = [f.family, ...(f.together || [])];
 
-  const why = [`In use before ${f.hits === f.relevant ? `all ${f.relevant}` : `${f.hits} of ${f.relevant}`} of your ${areaWords} bad days`];
-  if (fineOnes.length) why.push(`, but it’s also in ${joinWords(fineOnes.map((p) => p.name))}, which ${fineOnes.length > 1 ? 'have' : 'has'} been fine for you.`);
-  else why.push(f.hits === f.relevant ? ', and in nothing that’s been fine for you.' : '.');
-
+  const before = `Before ${f.hits === f.relevant ? `all ${f.relevant}` : `${f.hits} of ${f.relevant}`} ${areaWords} bad days`;
+  const doubt = fineOnes.length
+    ? `But ${joinWords(fineOnes.map((p) => p.name))} ${fineOnes.length > 1 ? 'have' : 'has'} it too and ${fineOnes.length > 1 ? 'have' : 'has'} been fine.`
+    : f.hits === f.relevant ? 'Not in anything that’s been fine for you.' : 'Not every time, so it may not be the cause.';
+  const tryThis = live.length
+    ? `Skip ${live.length > 1 ? 'these' : 'it'} for two weeks. If the bad days stop, you’ve found it.`
+    : 'You’ve already stopped everything with it. Watch for it in new products.';
   const choose = async (status) => {
     try { await mutate('insight.status', { family: f.family, status: f.status === status ? 'ai' : status }); }
     catch (e) { toast(e.message); }
@@ -125,17 +120,16 @@ function ingredientCard(f, compact) {
     h('div', { class: 'fm-ing-head' },
       h('h3', null, joinWords(names)),
       h('span', { class: 'fm-badge' + (likely ? ' on' : '') }, f.status === 'agree' ? 'You said yes' : likely ? 'Likely' : 'Maybe')),
-    dots(st.reactions.filter((r) => areaKeys.includes(r.area)), (w) => w.productIds.some((id) => f.productIds.includes(id))),
-    h('p', { class: 'fm-why' }, why.join(''))];
+    h('div', { class: 'fm-evidence' },
+      dots(st.reactions.filter((r) => areaKeys.includes(r.area)), (w) => w.productIds.some((id) => f.productIds.includes(id))),
+      h('span', null, before, h('span', { class: 'muted' }, ` · ${doubt}`)))];
+  const rows = [
+    ['Why it can irritate', h('span', null, whyFor(f.family), names.length > 1 ? h('span', { class: 'muted' }, ` Always comes with ${joinWords(names.slice(1).map((x) => x.toLowerCase()))}, so they can’t be told apart yet.`) : null)],
+    [live.length ? 'Still in' : 'Was in', h('div', { class: 'fm-chips' }, (live.length ? live : prods).map((p) => h('button', { class: 'hs-chip', onclick: () => openProduct(p) }, thumb(p), h('span', null, p.name))))],
+    ['Try this', tryThis],
+  ];
   const rest = [
-    names.length > 1 ? h('p', { class: 'fm-why muted' }, `These always come in the same products, so they can’t be told apart yet.`) : null,
-    f.aiWritten && f.explanation ? h('p', { class: 'fm-ai' }, f.explanation) : null,
-    h('div', { class: 'fm-where' },
-      h('div', { class: 'mono' }, live.length ? 'Still on your shelf in' : 'Was in'),
-      h('div', { class: 'fm-chips' }, (live.length ? live : prods).map((p) => h('button', { class: 'hs-chip', onclick: () => openProduct(p) }, thumb(p), h('span', null, p.name))))),
-    likely && live.length
-      ? h('p', { class: 'fm-tip' }, `Want to be sure? Skip ${live.length > 1 ? 'these' : 'it'} for two weeks and log any bad days. If they stop, you have your answer.`)
-      : null,
+    h('dl', { class: 'fm-rows' }, rows.map(([k, v]) => [h('dt', null, k), h('dd', null, v)])),
     h('div', { class: 'fm-ask' },
       h('span', null, 'Sound right to you?'),
       h('button', { class: 'chip' + (f.status === 'agree' ? ' on' : ''), onclick: () => choose('agree') }, 'Yes'),
@@ -171,14 +165,12 @@ function leftovers() {
   const ins = store.state.insights;
   const ruled = ins.families.filter((f) => f.status === 'reject');
   const common = ins.families.filter((f) => f.level === 'too-common');
+  if (!ruled.length && !common.length) return null;
   return h('div', { class: 'fm-leftovers' },
     ruled.length ? h('p', null, h('b', null, 'You ruled out: '), ruled.map((f, i) => [i ? ', ' : '',
       h('button', { class: 'link', onclick: () => mutate('insight.status', { family: f.family, status: 'ai' }) }, f.family)]), h('span', { class: 'muted' }, ' (tap to undo)')) : null,
     common.length ? h('p', { class: 'muted' }, `${joinWords(common.map((f) => f.family))} ${common.length > 1 ? 'are' : 'is'} in almost everything you use, so ${common.length > 1 ? 'they' : 'it'} can’t be blamed or cleared.`) : null,
-    h('button', { class: 'btn small', onclick: async (e) => {
-      e.currentTarget.disabled = true;
-      try { askedFor = ''; await refreshInsights(); toast('Re-checked'); } catch (err) { toast(err.message); }
-    } }, 'Ask AI to re-check'));
+  );
 }
 
 const stepHead = (n, text) => h('div', { class: 'fm-step-head' }, h('span', { class: 'mono' }, n.padStart(2, '0')), h('h2', null, text));

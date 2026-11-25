@@ -578,3 +578,11 @@ button.rail-item:hover:not(.on) .n { text-decoration: underline; text-underline-
 .fm-ing.maybe:hover { border-color: var(--rule); }
 .fm-ings + .fm-ings { margin-top: 0; }
 .fm-ings.compact { gap: 10px; }
+.fm-evidence { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; margin-top: 10px; font-size: 15px; }
+.fm-evidence .fm-dots { margin-top: 0; }
+.fm-rows { display: grid; grid-template-columns: 150px 1fr; gap: 12px 20px; margin: 18px 0 0; }
+.fm-rows dt { font-family: var(--mono); font-size: 10.5px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); padding-top: 4px; }
+.fm-rows dd { margin: 0; font-size: 16px; line-height: 1.45; max-width: 760px; }
+.fm-rows dd .fm-chips { margin-top: 0; }
+.fm-ing.maybe > summary .fm-evidence { font-size: 14.5px; }
+@media (max-width: 640px) { .fm-rows { grid-template-columns: 1fr; gap: 4px; } .fm-rows dd { margin-bottom: 10px; } }
