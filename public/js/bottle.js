@@ -130,14 +130,15 @@ export function prepare(src) {
         const rowHits = new Uint32Array(hh), colHits = new Uint32Array(w);
         for (let y = 0; y < hh; y++) for (let x = 0; x < w; x++) {
           const i = (y * w + x) * 4;
-          if (765 - px[i] - px[i + 1] - px[i + 2] > 36) { rowHits[y]++; colHits[x]++; }
+          // low threshold: white caps and pale tubes must count as product, not background
+          if (765 - px[i] - px[i + 1] - px[i + 2] > 14) { rowHits[y]++; colHits[x]++; }
         }
-        const minRow = Math.max(2, w * 0.004), minCol = Math.max(2, hh * 0.004);
+        const minRow = 2, minCol = 2;   // even a thin outline (a white cap's edge) counts
         let top = rowHits.findIndex((n) => n >= minRow), left = colHits.findIndex((n) => n >= minCol);
         let bottom = hh - 1 - [...rowHits].reverse().findIndex((n) => n >= minRow);
         let right = w - 1 - [...colHits].reverse().findIndex((n) => n >= minCol);
         if (top < 0 || left < 0 || bottom <= top || right <= left) { top = 0; left = 0; bottom = hh - 1; right = w - 1; }
-        const pad = Math.round(Math.max(right - left, bottom - top) * 0.04);
+        const pad = Math.round(Math.max(right - left, bottom - top) * 0.06);
         top = Math.max(0, top - pad); left = Math.max(0, left - pad);
         bottom = Math.min(hh - 1, bottom + pad); right = Math.min(w - 1, right + pad);
         ctx.putImageData(data, 0, 0);

@@ -12,7 +12,7 @@ const SERIAL = ['routines', 'products', 'reactions', 'events', 'chat'];
 export default handler(async (req, res) => {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Use POST' });
   const { action, key } = req.json;
-  const isDemo = String(action || '').startsWith('demo.');
+  const isDemo = String(action || '').startsWith('demo.') || action === 'data.wipe';
   if (!process.env.OWNER_KEY && !isDemo) throw new UserError('Owner tools are off. Set OWNER_KEY in Vercel to turn them on.');
   // Demo data is harmless (marked, removable in one click), so it never needs the passcode.
   if (isDemo) return res.status(200).json(await demo(action, req.json, today(req)));
@@ -44,7 +44,20 @@ export default handler(async (req, res) => {
 const at = (date, time) => `${date}T${time}:00Z`;
 
 async function demo(action, body, todayISO) {
+  if (action === 'data.wipe') {
+    for (const t of ['products', 'photos', 'reactions', 'events', 'chat', 'insight_status', 'insight_cache', 'snapshots', 'profile', 'routines']) await q(`delete from ${t}`);
+    const names = ['Morning', 'Night', 'Hair', 'Body'];
+    for (let i = 0; i < names.length; i++) await q(`insert into routines (name, position) values ($1, $2)`, [names[i], i]);
+    await setFlag('demo', 'removed');   // stays empty: the demo doesn't come back by itself
+    return getState(todayISO);
+  }
+
   if (action === 'demo.plan') {
+    // The demo loads once, by itself, on a fresh MyShelf. Only one visitor can start it.
+    const flag = (await q(`select value, at from app_flags where key = 'demo'`))[0];
+    const busy = flag?.value === 'seeding' && Date.now() - new Date(flag.at).getTime() < 5 * 60000;
+    if (flag?.value === 'done' || flag?.value === 'removed' || busy) return { ...(await getState(todayISO)), demoTodo: [] };
+    await setFlag('demo', 'seeding');
     // Which demo products aren't on MyShelf yet (so nothing is added twice).
     const have = await q(`select lower(name) as name, lower(coalesce(brand, '')) as brand from products`);
     const todo = DEMO_PRODUCTS.map((d, index) => ({ index, name: d.name, brand: d.brand, curated: Boolean(d.ingredients) }))
@@ -79,6 +92,8 @@ async function demo(action, body, todayISO) {
   }
 
   if (action === 'demo.finish') {
+    const flag = (await q(`select value from app_flags where key = 'demo'`))[0];
+    if (flag?.value === 'done' || flag?.value === 'removed') return getState(todayISO);
     // The story starts with her skin profile (June 1, no known allergens yet). On Oct 9, after
     // MyShelf showed the pattern, she confirmed fragrance and added it to her allergens.
     const backdateLast = async (kind, when) =>
@@ -109,6 +124,7 @@ async function demo(action, body, todayISO) {
       await q(`update reactions set demo = true, created_at = $1 where id = $2`, [at(r.date, '20:30'), row.id]);
       await q(`update events set at = $1 where kind = 'reaction.add' and data->>'reactionId' = $2`, [at(r.date, '20:30'), String(row.id)]);
     }
+    await setFlag('demo', 'done');
     return getState(todayISO);
   }
 
@@ -128,4 +144,8 @@ async function demo(action, body, todayISO) {
     return getState(todayISO);
   }
   throw new UserError('Unknown action.');
+}
+
+async function setFlag(key, value) {
+  await q(`insert into app_flags (key, value) values ($1, $2) on conflict (key) do update set value = $2, at = now()`, [key, value]);
 }

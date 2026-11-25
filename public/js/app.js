@@ -8,6 +8,7 @@ import { renderChat, leaveChat } from './chat.js';
 import { openBadDay } from './reaction.js';
 import { openOnboarding, openSettings, initials } from './settings.js';
 import { findPhotos } from './store.js';
+import { loadDemo } from './demo.js';
 import { imageSrc, scoreImage } from './bottle.js';
 
 const view = document.getElementById('view');
@@ -57,8 +58,13 @@ async function start() {
   put(view, h('div', { class: 'loading' }, h('div', null, h('span', { class: 'spinner' }), '  Opening your shelf…')));
   try {
     await load();
-    if (!store.state.profile) openOnboarding();
-    upgradePhotos();
+    // A fresh MyShelf starts with Nandini's demo story already on it.
+    if (!store.state.demo && !store.state.reactions.length) {
+      loadDemo('', () => {}).then(() => upgradePhotos()).catch(() => {});
+    } else {
+      if (!store.state.profile) openOnboarding();
+      upgradePhotos();
+    }
   } catch (e) {
     put(view, h('div', { class: 'empty' },
       h('h3', null, 'Couldn’t open your shelf'),

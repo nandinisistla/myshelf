@@ -112,7 +112,7 @@ export function openAdd({ routineId = null, prefill = '' } = {}) {
         const front = b.querySelector('.face.front');
         prepare(draft.photo).then(({ url, blend }) => { front.classList.toggle('blend', blend); front.replaceChildren(h('img', { src: url, class: blend ? 'photo' : 'photo boxed', alt: '' })); });
       }
-      preview.replaceChildren(h('div', { class: 'p-tile' }, h('span', { class: 'floor', 'aria-hidden': 'true' }), b), h('div', { class: 'hint' }, 'Tap the bottle to see the back'));
+      preview.replaceChildren(h('div', { class: 'p-tile' }, h('span', { class: 'floor', 'aria-hidden': 'true' }), b));
     };
     drawPreview();
 

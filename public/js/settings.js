@@ -1,7 +1,6 @@
 // Skin profile (used to explain ingredients "for you") and owner tools.
 import { h, toast, openSheet, confirmSheet } from './ui.js';
 import { store, mutate, admin } from './store.js';
-import { loadDemo, clearDemo } from './demo.js';
 
 const SKIN = ['Dry', 'Oily', 'Combination', 'Normal'];
 export const PROBLEMS = ['Redness', 'Dark spots', 'Breakouts', 'Sensitivity', 'Dryness', 'Oiliness', 'Uneven texture', 'Itchy skin', 'Dandruff', 'Hair thinning'];
@@ -76,13 +75,7 @@ export function openOnboarding() {
 export function openSettings() {
   let sh;
   const form = profileForm(() => {}, false);
-  const key = h('input', { class: 'input', type: 'password', placeholder: 'Owner passcode', autocomplete: 'off' });
-  const ownerErr = h('div', { class: 'err' });
-  const demoStatus = h('p', { class: 'small', style: 'font-family:var(--mono);margin:4px 0' });
-  const run = async (action, msg, warn) => {
-    if (warn && !(await confirmSheet(warn, 'Reset'))) return;
-    try { await admin(action, key.value); toast(msg); ownerErr.textContent = ''; } catch (e) { ownerErr.textContent = e.message; }
-  };
+  const err = h('div', { class: 'err' });
   sh = openSheet({
     title: 'Your skin profile',
     full: true,
@@ -90,38 +83,15 @@ export function openSettings() {
       ...form.body,
       h('button', { class: 'btn primary', style: 'margin-top:14px', onclick: form.save }, 'Save profile'),
       h('div', { class: 'section-h' }, 'About the AI'),
-      h('p', { class: 'muted small' }, 'MyShelf uses Claude to find ingredient lists, explain them in plain words, write pattern explanations and run the chat. The pattern counts themselves are plain math, so they’re exact. Everything the AI adds is labelled and editable.'),
+      h('p', { class: 'muted small' }, 'MyShelf uses Claude to find ingredient lists, explain them in plain words and run the chat. The pattern counts themselves are plain math, so they’re exact. Everything the AI adds is labelled and editable.'),
       h('p', { class: 'muted small' }, store.state.aiEnabled ? 'AI is on.' : 'AI is off: add ANTHROPIC_API_KEY in Vercel to turn it on.'),
-      h('div', { class: 'section-h' }, 'Owner tools'),
-      h('p', { class: 'muted small' }, 'Anyone with the link can try the app. Save a backup of your shelf, and reset to it if visitors change things.'),
-      key, ownerErr,
-      h('div', { class: 'p-actions' },
-        h('button', { class: 'btn small', onclick: () => run('save', 'Backup saved') }, 'Save backup'),
-        h('button', { class: 'btn small', onclick: () => run('restore', 'Shelf reset to your backup', 'Reset the whole app to your saved backup? Changes made since then will be lost.') }, 'Reset to backup')),
-      h('div', { class: 'section-h' }, 'Demo history'),
-      h('p', { class: 'muted small' }, 'Fills MyShelf with Nandini’s demo story: a summer routine with fragranced face products, eight bad days, the switch to a fragrance-free routine in October, and calm skin since. Each product photo is looked up for real, so it takes a minute or two. You can remove the demo in one click.'),
-      demoStatus,
-      h('div', { class: 'p-actions' },
-        h('button', { class: 'btn small primary', onclick: async (e) => {
-          const btn = e.currentTarget; btn.disabled = true; ownerErr.textContent = '';
-          try {
-            await loadDemo(key.value, (msg, n, total) => { demoStatus.textContent = total ? `${msg} · ${n} of ${total}` : msg; toast(msg); });
-          } catch (ex) { ownerErr.textContent = ex.message; }
-          btn.disabled = false;
-        } }, 'Add demo history'),
-        h('button', { class: 'btn small', onclick: async (e) => {
-          if (!(await confirmSheet('Replace the demo with a fresh copy of the demo story? Your own entries stay.', 'Rebuild'))) return;
-          const btn = e.currentTarget; btn.disabled = true; ownerErr.textContent = '';
-          try {
-            await clearDemo(key.value);
-            await loadDemo(key.value, (msg, n, total) => { demoStatus.textContent = total ? `${msg} · ${n} of ${total}` : msg; toast(msg); });
-          } catch (ex) { ownerErr.textContent = ex.message; }
-          btn.disabled = false;
-        } }, 'Rebuild demo story'),
-        h('button', { class: 'btn small', onclick: async () => {
-          if (!(await confirmSheet('Remove all demo products and demo bad days? Your own entries stay.', 'Remove'))) return;
-          try { await clearDemo(key.value); toast('Demo history removed'); demoStatus.textContent = ''; } catch (ex) { ownerErr.textContent = ex.message; }
-        } }, 'Remove demo history')),
+      h('div', { class: 'section-h' }, 'Your data'),
+      h('p', { class: 'muted small' }, 'Removes every product, bad day, photo, chat and your profile, and starts MyShelf empty. This can’t be undone.'),
+      err,
+      h('button', { class: 'btn small danger', onclick: async () => {
+        if (!(await confirmSheet('Remove all data from MyShelf? Every product, bad day, photo, chat and your profile will be deleted. This can’t be undone.', 'Remove all data', true))) return;
+        try { await admin('data.wipe', ''); sh.close(); toast('All data removed'); } catch (e) { err.textContent = e.message; }
+      } }, 'Remove all data'),
     ],
   });
 }

@@ -21,7 +21,6 @@ export function renderHistory(view) {
 
   put(view,
     h('section', { class: 'page-head' },
-      h('div', { class: 'eyebrow mono' }, `History · since ${first ? fmtDate(first, true) : 'today'}`),
       h('h1', { class: 'display' }, 'Your skin story', h('span', { class: 'soft' }, '.')),
       h('p', { class: 'lede' }, R.length
         ? `${R.length} bad day${R.length === 1 ? '' : 's'}, ${inUse} product${inUse === 1 ? '' : 's'} in use. Every bad day shows what you were using the week before.`
@@ -30,10 +29,7 @@ export function renderHistory(view) {
     h('div', { class: 'hs-filter' },
       h('button', { class: 'chip' + (onlyBad ? '' : ' on'), onclick: () => { onlyBad = false; renderHistory(view); } }, 'Everything'),
       h('button', { class: 'chip' + (onlyBad ? ' on' : ''), onclick: () => { onlyBad = true; renderHistory(view); } }, 'Bad days only')),
-    feed(st),
-    h('details', { class: 'hs-log' },
-      h('summary', { class: 'mono' }, 'Every change, including edits and the AI chat'),
-      log()));
+    feed(st));
 }
 
 // The one thing worth knowing, in a sentence: the clearest ingredient pattern if there is

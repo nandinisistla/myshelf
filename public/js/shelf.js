@@ -5,7 +5,6 @@ import { renderBottle } from './bottle.js';
 import { openProduct } from './product.js';
 import { openAdd } from './add.js';
 import { getHero } from './hero.js';
-import { loadDemo, demoState, onDemoProgress } from './demo.js';
 import { productAllergens, productHelps, isWorking } from './rules.js';
 
 const pad = (n) => String(n).padStart(2, '0');
@@ -17,15 +16,11 @@ export function renderShelf(view) {
   const past = st.products.filter((p) => p.stopped).sort((a, b) => (b.stopped || '').localeCompare(a.stopped || ''));
 
   const head = h('section', { class: 'page-head', id: 'shelf-start' },
-    h('div', { class: 'eyebrow mono' }, `Shelf · ${pad(onShelf.length)} product${onShelf.length === 1 ? '' : 's'} in use`),
     h('h1', { class: 'display' }, 'Your shelf', h('span', { class: 'soft' }, '.')),
-    h('p', { class: 'lede' }, onShelf.length
-      ? `${matchMedia('(hover: hover)').matches ? 'Hover' : 'Press and hold'} a product to see the back of the label. Open it to see every ingredient in plain words.`
-      : 'Add your first product. Type its name and MyShelf finds the photo and the full ingredient list.'),
+    h('p', { class: 'lede tagline' }, 'For your s', h('span', { class: 'h' }, 'h'), 'elf.'),
     h('div', { style: 'display:flex;gap:10px;margin-top:22px;flex-wrap:wrap' },
       h('button', { class: 'btn primary', onclick: () => openAdd() }, 'Add a product'),
-      h('button', { class: 'btn', onclick: newShelf }, 'New shelf'),
-      demoButton(st)));
+      h('button', { class: 'btn', onclick: newShelf }, 'New shelf')));
 
   const groups = st.routines.map((r, i) => group(r, i + 1, onShelf.filter((p) => p.routine_id === r.id), numberOf));
   const unsorted = onShelf.filter((p) => !p.routine_id || !st.routines.some((r) => r.id === p.routine_id));
@@ -131,21 +126,4 @@ async function removeShelf(r) {
   try { await mutate('routine.delete', { id: r.id }); toast('Shelf removed'); } catch (e) { toast(e.message); }
 }
 
-// One click to fill an empty MyShelf with five months of example history (for demos).
-function demoButton(st) {
-  const hasHistory = st.reactions.length || st.products.some((p) => p.demo);
-  if (hasHistory && !demoState.running) return null;
-  return h('button', {
-    class: 'btn', 'data-demo-btn': '', disabled: demoState.running ? '' : null,
-    title: 'Adds example products and bad days from the last five months. Remove them any time in Settings.',
-    onclick: () => loadDemo('', (msg) => toast(msg)).catch((e) => toast(e.message)),
-  }, demoState.running ? demoState.msg : 'Load demo history');
-}
-onDemoProgress(() => {
-  const b = document.querySelector('[data-demo-btn]');
-  if (!b) return;
-  const st = store.state;
-  const done = !demoState.running && (st.reactions.length || st.products.some((p) => p.demo));
-  if (done) b.remove();
-  else { b.textContent = demoState.running ? demoState.msg : 'Load demo history'; b.disabled = demoState.running; }
-});
+

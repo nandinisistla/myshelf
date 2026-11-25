@@ -19,7 +19,6 @@ export function renderForMe(view) {
   const st = store.state;
   const ins = st.insights;
   const head = h('section', { class: 'page-head' },
-    h('div', { class: 'eyebrow mono' }, `For me · ${ins.reactionCount} bad day${ins.reactionCount === 1 ? '' : 's'} · ${ins.productCount} products`),
     h('h1', { class: 'display' }, 'What your skin is telling you', h('span', { class: 'soft' }, '.')),
     h('p', { class: 'lede' }, 'Built from your skin profile and your bad days. Change your profile and this page changes with it.'),
     profileStrip());

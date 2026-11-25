@@ -10,13 +10,12 @@ let heroEl = null;
 export function getHero() {
   if (heroEl) return heroEl;
   const canvas = h('canvas', { class: 'hero-canvas', 'aria-hidden': 'true' });
-  const cue = h('button', { class: 'scroll-cue', onclick: () => document.getElementById('shelf-start')?.scrollIntoView({ behavior: 'smooth' }) },
-    h('span', null, 'Scroll'), h('i', { 'aria-hidden': 'true' }, h('b')));
   heroEl = h('section', { class: 'hero', 'aria-label': 'MyShelf' },
     h('h1', { class: 'sr-only' }, 'MyShelf'),
     h('div', { class: 'hero-corner l mono' }, 'Skincare, connected'),
     h('div', { class: 'hero-corner r mono' }, '© 2026'),
-    canvas, cue);
+    canvas);
+  slideBetween();
   requestAnimationFrame(() => start(canvas));
   return heroEl;
 }
@@ -170,4 +169,47 @@ function start(canvas) {
     rt = setTimeout(() => { intro = intro && !parts.length; build(); }, 150);
   }).observe(canvas);
   build();
+}
+
+// One scroll (wheel, swipe or key) moves from the hero to the shelf like the next slide,
+// and back up again from the top of the shelf.
+let sliding = false;
+function slideBetween() {
+  const nav = () => parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--nav')) || 64;
+  const shelfTop = () => {
+    const el = document.getElementById('shelf-start');
+    if (!el || !heroEl?.isConnected) return null;
+    return Math.round(el.getBoundingClientRect().top + window.scrollY - nav());
+  };
+  const go = (top) => {
+    if (sliding) return;
+    sliding = true;
+    window.scrollTo({ top, behavior: 'smooth' });
+    setTimeout(() => { sliding = false; }, 900);
+  };
+  const decide = (down) => {
+    const top = shelfTop();
+    if (top == null) return false;
+    const y = window.scrollY;
+    if (down && y < top - 4) { go(top); return true; }
+    if (!down && y > 0 && y <= top + 4) { go(0); return true; }
+    return false;
+  };
+  window.addEventListener('wheel', (e) => {
+    if (Math.abs(e.deltaY) < 4 || document.querySelector('.sheet-wrap')) return;
+    if (sliding) { if (shelfTop() != null && window.scrollY < shelfTop() + 4) e.preventDefault(); return; }
+    if (decide(e.deltaY > 0)) e.preventDefault();
+  }, { passive: false });
+  let y0 = null;
+  window.addEventListener('touchstart', (e) => { y0 = e.touches[0].clientY; }, { passive: true });
+  window.addEventListener('touchend', (e) => {
+    if (y0 == null) return;
+    const dy = y0 - e.changedTouches[0].clientY; y0 = null;
+    if (Math.abs(dy) > 30) decide(dy > 0);
+  }, { passive: true });
+  window.addEventListener('keydown', (e) => {
+    if (['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement?.tagName)) return;
+    if (['ArrowDown', 'PageDown', ' '].includes(e.key) && decide(true)) e.preventDefault();
+    if (['ArrowUp', 'PageUp'].includes(e.key) && decide(false)) e.preventDefault();
+  });
 }
