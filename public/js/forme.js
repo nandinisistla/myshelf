@@ -132,13 +132,16 @@ function ingredientsSection() {
     return true;
   });
   const likely = cards.filter((f) => f.status === 'agree' || f.level === 'strong');
-  const maybe = cards.filter((f) => !likely.includes(f));
+  // "Probably not" is only worth saying about things that can actually irritate.
+  const maybe = cards.filter((f) => !likely.includes(f) && !HARMLESS.has(f.family));
   return h('section', { class: 'fm-step' },
     stepHead('What might be causing it'),
     likely.length ? h('div', { class: 'fm-ings' }, likely.map((f) => ingredientCard(f, false))) : null,
     maybe.length ? h('div', { class: 'fm-sub mono' }, 'Probably not the cause') : null,
     maybe.length ? h('div', { class: 'fm-ings' }, maybe.map((f) => ingredientCard(f, true))) : null);
 }
+// Ingredient types that almost never cause reactions: no "probably not" card for these.
+const HARMLESS = new Set(['Antioxidants', 'Humectants', 'Soothing ingredients', 'Peptides', 'Water & base', 'Thickeners & texture', 'pH adjusters', 'Other']);
 const rank = (f) => (f.status === 'agree' ? 0 : f.level === 'strong' ? 1 : 2);
 
 function ingredientCard(f, compact) {

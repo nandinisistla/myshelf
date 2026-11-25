@@ -793,3 +793,16 @@ button.rail-item:hover:not(.on) .n { text-decoration: underline; text-underline-
 .fm-ing .fm-dots { margin-top: 12px; }
 .fm-watch .was { color: var(--amber-ink); }
 .fm-group .lbl { text-transform: none; letter-spacing: 0; font-family: inherit; font-size: 14px; }
+/* product page: a few plain sentences under the name */
+.p-lines { margin-top: 14px; display: grid; gap: 6px; text-align: center; max-width: 520px; }
+.p-line { margin: 0; font-size: 16px; line-height: 1.45; color: var(--ink); }
+.p-line.ok { color: #2f5a39; }
+.p-line.warn { color: var(--amber-ink); }
+.ing .note { margin-top: 4px; font-size: 14px; color: var(--muted); }
+.ing .note.ok { color: #2f5a39; }
+.ing .note.warn { color: var(--amber-ink); }
+/* Ask MyShelf: same page header as the other tabs; calmer bubbles */
+.chat-head { padding-bottom: 12px; }
+.msg.assistant { background: var(--paper-2); border-color: var(--hair); line-height: 1.5; }
+.msg .acts .pill { border-color: rgba(63,122,76,.45); color: #2f5a39; background: rgba(63,122,76,.06); }
+.suggest .chip { font-size: 14.5px; }

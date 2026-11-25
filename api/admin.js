@@ -52,6 +52,19 @@ async function demo(action, body, todayISO) {
     return getState(todayISO);
   }
 
+  if (action === 'demo.fill') {
+    // The demo loaded, but some of its products never made it (a lookup failed or the
+    // tab was closed). Add just those, once at a time.
+    const flag = (await q(`select value from app_flags where key = 'demo'`))[0];
+    const busy = (await q(`select at from app_flags where key = 'demo_fill'`))[0];
+    if (flag?.value === 'removed' || (busy && Date.now() - new Date(busy.at).getTime() < 5 * 60000)) return { ...(await getState(todayISO)), demoTodo: [] };
+    await setFlag('demo_fill', 'running');
+    const have = await q(`select lower(name) as name, lower(coalesce(brand, '')) as brand from products`);
+    const todo = DEMO_PRODUCTS.map((d, index) => ({ index, name: d.name, brand: d.brand, curated: Boolean(d.ingredients) }))
+      .filter((d) => !have.some((p) => p.name.includes(DEMO_PRODUCTS[d.index].match) && p.brand.includes(d.brand.toLowerCase())));
+    return { ...(await getState(todayISO)), demoTodo: todo };
+  }
+
   if (action === 'demo.plan') {
     // The demo loads once, by itself, on a fresh MyShelf. Only one visitor can start it.
     const flag = (await q(`select value, at from app_flags where key = 'demo'`))[0];

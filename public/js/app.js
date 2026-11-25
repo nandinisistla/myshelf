@@ -8,7 +8,7 @@ import { renderChat, leaveChat } from './chat.js';
 import { openBadDay } from './reaction.js';
 import { openOnboarding, openSettings, initials } from './settings.js';
 import { findPhotos, admin } from './store.js';
-import { loadDemo } from './demo.js';
+import { loadDemo, fillDemo } from './demo.js';
 import { startBlobs } from './blob.js';
 import { startSlides } from './slides.js';
 import { startEffects, newView } from './effects.js';
@@ -70,6 +70,8 @@ async function start() {
       admin('demo.reset', '').then(() => loadDemo('', () => {})).then(() => upgradePhotos()).catch(() => {});
     } else if (!store.state.demo && !store.state.reactions.length) {
       loadDemo('', () => {}).then(() => upgradePhotos()).catch(() => {});
+    } else if (store.state.demoMissing) {
+      fillDemo().then(() => upgradePhotos()).catch(() => {});
     } else {
       if (!store.state.profile) openOnboarding();
       upgradePhotos();

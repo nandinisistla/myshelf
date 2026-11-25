@@ -7,10 +7,10 @@ let attachments = [];    // data URLs
 let draft = '';
 
 const SUGGESTIONS = [
-  'Add my SKIN1004 Madagascar Centella sunscreen to my morning shelf',
-  'My scalp was itchy yesterday',
-  'I stopped using the azelaic acid last week',
   'Does anything on my shelf have fragrance?',
+  'Add CeraVe Moisturizing Cream to my night shelf',
+  'My scalp was itchy yesterday',
+  'Is my sunscreen OK for redness?',
 ];
 
 export function renderChat(view) {
@@ -21,12 +21,15 @@ export function renderChat(view) {
       h('div', { class: 'msg assistant typing' }, h('span', { class: 'spinner', style: 'width:14px;height:14px;margin-right:8px' }), 'Working on it…')] : null);
 
   const intro = !st.chat.length && !pending ? [
-    h('p', { class: 'sub', style: 'margin-top:4px' }, 'Tell me what happened and I’ll update your shelf, history and patterns. You can also send a photo of a label.'),
     st.aiEnabled ? null : h('div', { class: 'callout' }, 'AI isn’t set up yet: add ANTHROPIC_API_KEY in Vercel.'),
     h('div', { class: 'suggest' }, SUGGESTIONS.map((t) => h('button', { class: 'chip', onclick: () => send(t) }, t))),
   ] : null;
 
-  put(view, h('div', { class: 'top' }, h('h1', { class: 'title' }, 'Ask AI')), intro, msgs);
+  put(view,
+    h('section', { class: 'page-head chat-head' },
+      h('h1', { class: 'display' }, 'Ask AI', h('span', { class: 'soft' }, '.')),
+      h('p', { class: 'lede' }, 'Ask about your products, or tell it what happened. It updates your shelf for you.')),
+    intro, msgs);
   renderComposer();
   requestAnimationFrame(() => { window.scrollTo({ top: document.body.scrollHeight, behavior: 'instant' }); });
 }

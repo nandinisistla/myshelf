@@ -1,8 +1,38 @@
 // Product page: the bottle, when you used it, and every ingredient in plain words.
 import { verdict, productAllergens, productHelps, isWorking } from './rules.js';
-import { h, put, toast, confirmSheet, openSheet, fmtDate, howLong, AREAS, compressImage } from './ui.js';
+import { h, put, toast, confirmSheet, openSheet, fmtDate, howLong, daysBetween, AREAS, compressImage } from './ui.js';
 import { store, mutate, S, onChange, findPhotos } from './store.js';
 import { renderBottle, rankImages, imageSrc, scoreImage } from './bottle.js';
+
+const AREA_WORD = { face: 'face', scalp: 'scalp', body: 'body' };
+const listWords = (xs) => xs.length < 2 ? xs.join('') : `${xs.slice(0, -1).join(', ')} and ${xs[xs.length - 1]}`;
+
+// Two or three plain sentences: is it working for you, what it helps with, anything to watch.
+function summaryLines(p, { fine, susFamilies, allergensIn, helps }) {
+  const st = store.state;
+  const area = AREA_WORD[p.area];
+  const out = [];
+  if (p.stopped) {
+    const after = st.reactions.filter((r) => r.area === p.area && r.date > p.stopped).length;
+    const calm = susFamilies.length && after === 0 && daysBetween(p.stopped, st.today) >= 14;
+    out.push(['', `You used this from ${fmtDate(p.started)} to ${fmtDate(p.stopped)}.`]);
+    if (susFamilies.length) out.push(['warn', `It has ${listWords(susFamilies.map((f) => f.toLowerCase()))}, which was probably bothering your ${area}.`]);
+    if (calm) out.push(['ok', `✓ Your ${area} has been fine since you stopped.`]);
+  } else if (susFamilies.length) {
+    out.push(['warn', `It has ${listWords(susFamilies.map((f) => f.toLowerCase()))}, which may be what’s bothering your ${area}.`]);
+  } else if (fine) {
+    out.push(['ok', `✓ This works for you. You’ve used it for ${howLong(p.started, st.today)} with no bad days.`]);
+  } else {
+    out.push(['', `You started this ${p.started === st.today ? 'today' : `${howLong(p.started, st.today)} ago`}. After two weeks with no bad days, MyShelf will mark it safe.`]);
+  }
+  if (helps.size && !p.stopped) out.push(['', `It helps with your ${listWords([...helps.keys()].map((x) => x.toLowerCase()))}.`]);
+  if (allergensIn.length && !susFamilies.length) {
+    out.push(fine
+      ? ['', `It has ${listWords(allergensIn.map((x) => x.toLowerCase()))}, which you avoid, but your ${area} is fine with it.`]
+      : ['warn', `It has ${listWords(allergensIn.map((x) => x.toLowerCase()))}, which is on your allergen list.`]);
+  }
+  return out.map(([tone, text]) => h('p', { class: 'p-line ' + tone }, text));
+}
 
 export function openProduct(prod) {
   let mode = 'plain';
@@ -27,9 +57,6 @@ export function openProduct(prod) {
     const allergensIn = productAllergens(p);
     const helps = productHelps(p);
 
-    const status = p.stopped
-      ? h('span', { class: 'pill' }, `Used ${fmtDate(p.started)} – ${fmtDate(p.stopped)}`)
-      : h('span', { class: 'pill dark' }, `On your shelf · ${howLong(p.started, st.today)}`);
 
     const routineSel = h('select', { class: 'input', 'aria-label': 'Shelf', onchange: (e) => save({ routine_id: e.target.value ? Number(e.target.value) : null }, 'Moved') },
       h('option', { value: '' }, 'Unsorted'),
@@ -70,10 +97,8 @@ export function openProduct(prod) {
               h('div', { class: 'pn' }, i.plain || i.inci),
               i.plain && i.plain !== i.inci ? h('div', { class: 'inci' }, i.inci) : null,
               i.does ? h('div', { class: 'does' }, i.does) : null,
-              v.note ? h('div', { class: 'foryou' }, h('b', null, 'For you: '), v.note) : null,
-              h('div', { class: 'fam' }, h('span', { class: 'pill' + (trig || v.flag === 'avoid' ? ' amber' : '') }, i.family),
-                v.flag === 'avoid' ? h('span', { class: 'pill amber', style: 'margin-left:6px' }, 'on your avoid list') : null,
-                trig ? h('span', { class: 'pill amber', style: 'margin-left:6px' }, 'possible trigger') : null)));
+              trig ? h('div', { class: 'note warn' }, `This may be what’s bothering your ${AREA_WORD[p.area]}.`)
+                : v.note ? h('div', { class: 'note ' + (v.flag === 'good' ? 'ok' : v.flag === 'avoid' || v.flag === 'watch' ? 'warn' : '') }, (v.flag === 'good' ? '✓ ' : '') + v.note) : null));
         })
       : h('p', { class: 'label-view' }, list.map((i, n) => [h('span', { class: sus.has(i.family) ? 'w' : '' }, i.inci), n < list.length - 1 ? ', ' : '']));
 
@@ -83,7 +108,7 @@ export function openProduct(prod) {
     if (src && !p.has_photo) scoreImage(src).then((r) => {
       if (r.width && Math.min(r.width, r.height) < 600) {
         lowRes.replaceChildren(h('div', { class: 'callout', style: 'display:flex;justify-content:space-between;align-items:center;gap:10px' },
-          h('span', null, 'This photo is small, so it may look blurry.'),
+          h('span', null, 'This photo is a bit blurry.'),
           h('button', { class: 'btn small', onclick: () => pickPicture(p, fileInput) }, 'Find a sharper one')));
       }
     });
@@ -93,26 +118,16 @@ export function openProduct(prod) {
         h('div', { class: 'p-tile' }, h('span', { class: 'floor', 'aria-hidden': 'true' }), renderBottle(p, { big: true, showName: false })),
         h('div', { class: 'p-name' }, p.name),
         h('div', { class: 'p-meta' }, [p.brand, AREAS[p.area]].filter(Boolean).join(' · ')),
-        h('div', { class: 'p-status' }, status,
-          fine ? h('span', { class: 'pill ok' }, 'Seems fine for you') : null,
-          [...helps.keys()].slice(0, 2).map((pr) => h('span', { class: 'pill ok' }, `Helps with ${pr.toLowerCase()}`)),
-          fine ? null : allergensIn.map((a) => h('span', { class: 'pill amber' }, `Has ${a.toLowerCase()}`)),
-          susFamilies.length ? h('span', { class: 'pill amber' }, 'Has a possible trigger') : null)),
+        h('div', { class: 'p-lines' }, summaryLines(p, { fine, susFamilies, allergensIn, helps }))),
       lowRes,
       controls,
-      h('div', { class: 'easier' }, h('h3', null, "Let's make it easier"),
+      h('div', { class: 'easier' }, h('h3', null, 'What’s inside'),
         h('div', { class: 'seg', role: 'tablist' },
           h('button', { class: mode === 'plain' ? 'on' : '', onclick: () => { mode = 'plain'; render(); } }, 'Plain words'),
           h('button', { class: mode === 'label' ? 'on' : '', onclick: () => { mode = 'label'; render(); } }, 'Label'))),
-      p.summary ? h('p', { class: 'summary' }, p.summary) : null,
-      allergensIn.length && fine ? h('div', { class: 'callout ok' }, `Has ${allergensIn.join(' and ').toLowerCase()}, which is on your avoid list, but your ${p.area} has been fine with this product. It’s working for you, so keep it.`) : null,
-      allergensIn.length && !fine ? h('div', { class: 'callout' }, `Contains ${allergensIn.join(' and ').toLowerCase()}, which is on your avoid list.${p.stopped ? '' : ' Keep an eye on how your skin reacts, or look for a version without it.'}`) : null,
-      helps.size ? h('div', { class: 'callout ok' }, [...helps].map(([pr, ings]) => `Helps with ${pr.toLowerCase()} (${ings.join(', ').toLowerCase()}).`).join(' ')) : null,
-      susFamilies.length ? h('div', { class: 'callout' }, `Contains ${susFamilies.slice(0, 2).join(' and ').toLowerCase()}${susFamilies.length > 2 ? ` (+${susFamilies.length - 2} more)` : ''}, which keeps showing up before your bad days. See “For me” for the evidence.`) : null,
       list.length ? ingList : h('div', { class: 'ai-note' }, 'No ingredient list yet. Tap “Edit list” to paste one.'),
       h('div', { class: 'sources' },
-        h('div', null, `Found by AI${p.confidence ? ` · confidence: ${p.confidence}` : ''}. AI can make mistakes, so check anything important.`),
-        p.ai_note ? h('div', { style: 'margin-top:4px' }, p.ai_note) : null,
+        h('div', null, p.confidence === 'high' && !(p.sources || []).length ? 'Ingredients from the product label.' : 'Ingredients found online by AI. It can make mistakes, so check the label if something matters.'),
         (p.sources || []).map((src) => h('a', { href: src.url, target: '_blank', rel: 'noopener' }, src.title || src.url)),
         p.image_credit ? h('div', { style: 'margin-top:6px' }, p.image_credit) : null,
         h('div', { style: 'margin-top:12px' }, h('button', { class: 'btn small', onclick: () => { editing = true; render(); } }, 'Edit list'))),
