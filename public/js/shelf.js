@@ -17,7 +17,7 @@ export function renderShelf(view) {
 
   const head = h('section', { class: 'page-head', id: 'shelf-start' },
     h('h1', { class: 'display' }, 'Your shelf', h('span', { class: 'soft' }, '.')),
-    h('p', { class: 'lede tagline' }, 'For your s', h('span', { class: 'h' }, 'h'), 'elf.'),
+    tagline(),
     h('div', { style: 'display:flex;gap:10px;margin-top:22px;flex-wrap:wrap' },
       h('button', { class: 'btn primary', onclick: () => openAdd() }, 'Add a product'),
       h('button', { class: 'btn', onclick: newShelf }, 'New shelf')));
@@ -126,3 +126,29 @@ async function removeShelf(r) {
 }
 
 
+
+// "For your shelf." — every time it comes into view, the grey h melts away and drips
+// off, and the letters slide together into "For your self."
+let taglineSeen = false;      // already played while on screen (so a re-draw doesn't replay it)
+function tagline() {
+  const hEl = h('span', { class: 'h melt', 'aria-hidden': 'true' }, 'h', h('i', { class: 'drip' }));
+  const el = h('p', { class: 'lede tagline', 'aria-label': 'For your shelf, for yourself.' }, 'For your s', hEl, 'elf.');
+  const reset = () => { el.classList.remove('melting', 'melted'); hEl.style.width = ''; };
+  const play = () => {
+    reset();
+    hEl.style.width = `${hEl.getBoundingClientRect().width}px`;
+    void hEl.offsetWidth;
+    el.classList.add('melting');
+    hEl.style.width = '0px';
+  };
+  const io = new IntersectionObserver(([e]) => {
+    if (!el.isConnected) { io.disconnect(); return; }
+    if (e.isIntersecting) {
+      if (taglineSeen) { el.classList.add('melted'); hEl.style.width = '0px'; return; }
+      taglineSeen = true;
+      setTimeout(() => { if (el.isConnected) play(); }, 700);
+    } else { taglineSeen = false; reset(); }
+  }, { threshold: 0.9 });
+  requestAnimationFrame(() => io.observe(el));
+  return el;
+}
