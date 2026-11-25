@@ -692,3 +692,6 @@ button.rail-item:hover:not(.on) .n { text-decoration: underline; text-underline-
   100% { opacity: 0; transform: translateY(1.3em) scale(.6, 1.6); }
 }
 @media (prefers-reduced-motion: reduce) { .tagline.melting .melt { animation: none; opacity: 0; } .tagline .melt { transition: width .3s; } }
+/* For me: each step is its own screen-sized slide */
+#view .slide { min-height: calc(100dvh - var(--nav)); box-sizing: border-box; margin-top: 0; padding-top: 48px; padding-bottom: 32px; }
+#view .page-head.slide { padding-top: 56px; }

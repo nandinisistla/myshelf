@@ -18,7 +18,7 @@ export function renderForMe(view) {
   stepNo = 0;
   const st = store.state;
   const ins = st.insights;
-  const head = h('section', { class: 'page-head' },
+  const head = h('section', { class: 'page-head slide' },
     h('h1', { class: 'display' }, 'What your skin is telling you', h('span', { class: 'soft' }, '.')),
     profileStrip());
 
@@ -46,7 +46,7 @@ function productsSection() {
     return { p, n: count.get(p.id) || 0, total };
   }).filter((x) => x.n >= 2 && x.n / x.total >= 0.6).sort((a, b) => b.n - a.n || b.n / b.total - a.n / a.total);
 
-  return h('section', { class: 'fm-step' },
+  return h('section', { class: 'fm-step slide' },
     stepHead('1', 'Products in use before your bad days'),
     list.length
       ? h('div', { class: 'fm-prods' }, list.map(({ p, n, total }) => {
@@ -74,7 +74,7 @@ function ingredientsSection() {
     .sort((a, b) => rank(a) - rank(b) || b.hits / b.relevant - a.hits / a.relevant || a.fineWith - b.fineWith);
   if (!sus.length) return null;
   const shown = new Set();
-  return h('section', { class: 'fm-step' },
+  return h('section', { class: 'fm-step slide' },
     stepHead('2', 'What might be causing it'),
     (() => {
       const cards = sus.filter((f) => {
@@ -157,7 +157,7 @@ function safeSection() {
   const st = store.state;
   const fine = st.insights.fineProductIds.map((id) => S.product(id)).filter(Boolean);
   if (!fine.length) return null;
-  return h('section', { class: 'fm-step' },
+  return h('section', { class: 'fm-step slide' },
     stepHead('4', 'Safe for you so far'),
     h('p', { class: 'fm-intro' }, 'Used for at least two weeks, with no bad day on that area while you were using them.'),
     h('div', { class: 'fm-safe' }, fine.map((p) => h('button', { class: 'fm-safe-item', onclick: () => openProduct(p) },
@@ -265,7 +265,7 @@ function avoidSection() {
       h('p', { class: 'fm-src' }, 'Sources: ', WATCH_SOURCES.map((x, n) => [n ? ' · ' : '', h('a', { href: x.url, target: '_blank', rel: 'noopener' }, x.title)])));
   }
 
-  return h('section', { class: 'fm-step' },
+  return h('section', { class: 'fm-step slide' },
     stepHead('', 'Try to avoid'),
     bothering.length ? h('div', { class: 'fm-avoid' }, bothering) : null,
     watch);
@@ -302,12 +302,12 @@ function problemsSection() {
   const st = store.state;
   const probs = st.profile?.problems || [];
   if (!probs.length) {
-    return h('section', { class: 'fm-step' }, stepHead('', 'Your skin problems'),
+    return h('section', { class: 'fm-step slide' }, stepHead('', 'Your skin problems'),
       h('p', { class: 'muted' }, 'Add your skin problems to your profile and MyShelf shows what on your shelf is working on each one.'),
       h('button', { class: 'btn small', onclick: () => openSettings() }, 'Add to profile'));
   }
   const live = st.products.filter((p) => !p.stopped);
-  return h('section', { class: 'fm-step' },
+  return h('section', { class: 'fm-step slide' },
     stepHead('', 'Your skin problems, and what’s working on them'),
     h('div', { class: 'fm-probs' }, probs.map((pr) => {
       const helpers = live.map((p) => ({ p, ings: productHelps(p).get(pr) })).filter((x) => x.ings);
