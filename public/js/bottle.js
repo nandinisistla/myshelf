@@ -116,29 +116,39 @@ export function prepare(src) {
         const med = (k) => { const v = border.map((i) => px[i + k]).sort((a, b) => a - b); return v[v.length >> 1]; };
         const bg = [med(0), med(1), med(2)];
         const offBorder = border.filter((i) => Math.abs(px[i] - bg[0]) + Math.abs(px[i + 1] - bg[1]) + Math.abs(px[i + 2] - bg[2]) > 30).length / border.length;
-        const light = bg[0] + bg[1] + bg[2] > 660 && offBorder < 0.25;
-        if (!light) return resolve({ url: src, blend: false });   // a scene, not a packshot: show it as a photo card
+        // A clean packshot sits on a light, neutral background (white, off-white, pale grey).
+        const neutral = Math.max(...bg) - Math.min(...bg) <= 28;
+        const light = bg[0] + bg[1] + bg[2] > 600 && neutral && offBorder < 0.3;
+        if (!light) return resolve({ url: src, blend: false });   // a scene or coloured backdrop: not clean
 
-        // Level the background to pure white, so it disappears completely on the tile.
-        const gain = bg.map((v) => 255 / Math.max(1, v));
+        // Level the background to white, so it disappears on the tile. The reference is the
+        // brightest part of the border, so a backdrop that darkens towards the corners doesn't
+        // blow out pale products; the corners are faded out separately below.
+        const hi = (k) => { const v = border.map((i) => px[i + k]).sort((a, b) => a - b); return v[Math.floor(v.length * 0.95)]; };
+        const ref = [hi(0), hi(1), hi(2)];
+        const gain = ref.map((v) => 255 / Math.max(1, v));
         for (let i = 0; i < px.length; i += 4) {
           px[i] = Math.min(255, px[i] * gain[0]);
           px[i + 1] = Math.min(255, px[i + 1] * gain[1]);
           px[i + 2] = Math.min(255, px[i + 2] * gain[2]);
         }
         // Crop to the product (and its shadow) so it fills the tile.
+        // "Product" = clearly darker than the backdrop's own edges. On plain white that's a
+        // very low bar (so white caps count); on a backdrop that greys towards the corners
+        // the bar rises with it, so the corners don't count as product.
+        const edgeDark = border.map((i) => 765 - px[i] - px[i + 1] - px[i + 2]).sort((a, b) => a - b);
+        const bar = Math.max(14, edgeDark[Math.floor(edgeDark.length * 0.9)] + 12);
         const rowHits = new Uint32Array(hh), colHits = new Uint32Array(w);
         for (let y = 0; y < hh; y++) for (let x = 0; x < w; x++) {
           const i = (y * w + x) * 4;
-          // low threshold: white caps and pale tubes must count as product, not background
-          if (765 - px[i] - px[i + 1] - px[i + 2] > 14) { rowHits[y]++; colHits[x]++; }
+          if (765 - px[i] - px[i + 1] - px[i + 2] > bar) { rowHits[y]++; colHits[x]++; }
         }
         const minRow = 2, minCol = 2;   // even a thin outline (a white cap's edge) counts
         let top = rowHits.findIndex((n) => n >= minRow), left = colHits.findIndex((n) => n >= minCol);
         let bottom = hh - 1 - [...rowHits].reverse().findIndex((n) => n >= minRow);
         let right = w - 1 - [...colHits].reverse().findIndex((n) => n >= minCol);
         if (top < 0 || left < 0 || bottom <= top || right <= left) { top = 0; left = 0; bottom = hh - 1; right = w - 1; }
-        const pad = Math.round(Math.max(right - left, bottom - top) * 0.06);
+        const pad = Math.round(Math.max(right - left, bottom - top) * 0.1);
         top = Math.max(0, top - pad); left = Math.max(0, left - pad);
         bottom = Math.min(hh - 1, bottom + pad); right = Math.min(w - 1, right + pad);
         ctx.putImageData(data, 0, 0);
@@ -147,6 +157,17 @@ export function prepare(src) {
         const o = out.getContext('2d');
         o.fillStyle = '#fff'; o.fillRect(0, 0, out.width, out.height);
         o.drawImage(c, left, top, out.width, out.height, 0, 0, out.width, out.height);
+        // Fade the edges of the photo to white, so no trace of the backdrop's border (a grey
+        // corner, a gradient, a floor) ever shows as a box on the tile.
+        const od = o.getImageData(0, 0, out.width, out.height); const op = od.data;
+        const band = Math.max(4, Math.round(Math.min(out.width, out.height) * 0.08));
+        for (let y = 0; y < out.height; y++) for (let x = 0; x < out.width; x++) {
+          const d = Math.min(x, y, out.width - 1 - x, out.height - 1 - y);
+          if (d >= band) continue;
+          const t = Math.pow(1 - d / band, 1.6); const i = (y * out.width + x) * 4;
+          op[i] += (255 - op[i]) * t; op[i + 1] += (255 - op[i + 1]) * t; op[i + 2] += (255 - op[i + 2]) * t;
+        }
+        o.putImageData(od, 0, 0);
         resolve({ url: out.toDataURL('image/jpeg', 0.93), blend: true });
       } catch { resolve({ url: src, blend: false }); }
     };
@@ -163,11 +184,37 @@ export function imageSrc(p) {
   return null;
 }
 
+// The cleanest photo we have for a product. If the chosen one has a busy or coloured
+// backdrop, quietly try its other photos and keep the first clean packshot (and remember
+// it), unless you picked or took the photo yourself.
+const bestCache = new Map();
+export function bestPhoto(p) {
+  const src = imageSrc(p);
+  if (!src) return Promise.resolve(null);
+  const key = `${p.id}:${src}`;
+  if (bestCache.has(key)) return bestCache.get(key);
+  const pr = prepare(src).then(async (first) => {
+    if (first.blend || p.has_photo || p.image_locked) return first;
+    const others = (p.image_options || []).filter((o) => o.url !== p.image_url).slice(0, 6);
+    for (const o of others) {
+      const r = await prepare(`/api/lookup?img=${encodeURIComponent(o.url)}`);
+      if (r.blend) {
+        const credit = o.source === 'Open Beauty Facts' ? 'Photo: Open Beauty Facts (CC BY-SA)' : `Image: ${o.source}`;
+        import('./store.js').then(({ mutate }) => mutate('product.update', { id: p.id, patch: { image_url: o.url, image_credit: credit } })).catch(() => {});
+        return r;
+      }
+    }
+    return first;
+  });
+  bestCache.set(key, pr);
+  return pr;
+}
+
 function frontFace(p) {
   const src = imageSrc(p);
   if (!src) return h('div', { class: 'face front' }, drawBottle(p));
   const face = h('div', { class: 'face front loading' });
-  prepare(src).then(({ url, blend }) => {
+  bestPhoto(p).then(({ url, blend }) => {
     const img = h('img', { src: url, alt: `${p.brand || ''} ${p.name}`.trim(), class: blend ? 'photo' : 'photo boxed', draggable: 'false' });
     img.onload = () => { face.classList.remove('loading'); face.classList.toggle('blend', blend); face.replaceChildren(img); };
     img.onerror = () => { face.classList.remove('loading'); face.replaceChildren(drawBottle(p)); };
@@ -293,7 +340,7 @@ export function thumb(p, size = '') {
   const box = h('span', { class: 'hs-thumb ' + size + (p.stopped ? ' past' : '') });
   const src = imageSrc(p);
   if (!src) { box.append(drawBottle(p)); return box; }
-  prepare(src).then(({ url, blend }) => {
+  bestPhoto(p).then(({ url, blend }) => {
     box.classList.toggle('blend', blend);
     box.append(h('img', { src: url, alt: '', draggable: 'false' }));
   });
