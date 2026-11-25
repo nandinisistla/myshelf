@@ -780,3 +780,6 @@ button.rail-item:hover:not(.on) .n { text-decoration: underline; text-underline-
 .hs-line .verb.add { background: rgba(63,122,76,.14); color: #2f5a39; }
 .hs-line .verb.no { background: rgba(22,22,21,.08); color: var(--ink); }
 .hs-filter .fm-dot { display: inline-block; width: 8px; height: 8px; vertical-align: 1px; }
+.fm-frac { font-size: 14.5px; color: var(--muted); }
+.fm-frac b { color: var(--ink); font-size: 15px; }
+.fm-key .fm-dot:not(.on) { border: 1.5px solid var(--amber); background: transparent; }

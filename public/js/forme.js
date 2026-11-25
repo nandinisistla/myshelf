@@ -13,7 +13,8 @@ import { productHelps, FAMILY_TO_ALLERGEN, allergenMatcher, matches, isWorking, 
 const AREA_WORD = { face: 'face', scalp: 'scalp', body: 'body' };
 const AREA_KEY = { Face: 'face', 'Hair & scalp': 'scalp', Body: 'body' };
 const joinWords = (xs) => xs.length < 2 ? xs.join('') : `${xs.slice(0, -1).join(', ')} and ${xs[xs.length - 1]}`;
-const frac = (a, b) => h('b', { class: 'fm-frac' }, `${a}/${b}`);
+// "In use before 8 of 8 face bad days", short: the number in bold, the meaning in words.
+const frac = (a, b, area = '') => h('span', { class: 'fm-frac' }, 'before ', h('b', null, `${a} of ${b}`), ` ${area ? area + ' ' : ''}bad days`);
 
 export function renderForMe(view) {
   stepNo = 0;
@@ -42,7 +43,8 @@ export function renderForMe(view) {
 // The three symbols, once, at the top.
 function key() {
   return h('div', { class: 'fm-key', 'aria-hidden': 'true' },
-    h('span', null, h('i', { class: 'fm-dot on' }), 'bad day'),
+    h('span', null, h('i', { class: 'fm-dot on' }), 'used the week before a bad day'),
+    h('span', null, h('i', { class: 'fm-dot' }), 'not used'),
     h('span', null, h('i', { class: 'sym ok' }, '✓'), 'fine for you'),
     h('span', null, h('i', { class: 'sym no' }, '✕'), 'stopped'));
 }
@@ -109,7 +111,7 @@ function productsSection() {
         thumb(p, 'lg'),
         h('div', { class: 'fm-prod-txt' },
           h('div', { class: 'nm' }, p.name),
-          h('div', { class: 'fm-evidence' }, dots(st.reactions.filter((r) => r.area === p.area), (w) => w.productIds.includes(p.id)), frac(n, total)),
+          h('div', { class: 'fm-evidence' }, dots(st.reactions.filter((r) => r.area === p.area), (w) => w.productIds.includes(p.id)), frac(n, total, AREA_WORD[p.area])),
           h('div', { class: 'fm-pills' },
             p.stopped ? h('span', { class: 'pill-s no' }, '✕ ', fmtDate(p.stopped)) : h('span', { class: 'pill-s warn' }, '● still using'),
             calm ? h('span', { class: 'pill-s ok' }, '✓ doing good since') : null)));
@@ -165,7 +167,7 @@ function ingredientCard(f, compact) {
       h('span', { class: 'fm-badge' + (likely ? ' on' : '') }, f.status === 'agree' ? '✓ You said yes' : likely ? 'Likely' : 'Maybe')),
     h('div', { class: 'fm-evidence' },
       dots(st.reactions.filter((r) => areaKeys.includes(r.area)), (w) => w.productIds.some((id) => f.productIds.includes(id))),
-      frac(f.hits, f.relevant), h('span', { class: 'muted' }, area),
+      frac(f.hits, f.relevant, area),
       h('span', { class: 'pill-s' + (fineOnes.length ? ' ok' : ''), title: doubtTitle }, doubt)),
     h('p', { class: 'fm-short', title: whyFor(f.family) }, h('span', { class: 'sym info' }, 'i'), whyShort(f.family))];
 
@@ -229,7 +231,7 @@ function avoidSection() {
           ? h('span', { class: 'sym-badge warn', title: 'Still in something you use' }, `● still on your ${where}`)
           : h('span', { class: 'sym-badge ok', title: `Not in anything you use on your ${where} that bothers you` }, `✓ off your ${where}`)),
       h('div', { class: 'fm-pills' },
-        f ? h('span', { class: 'pill-s' }, h('i', { class: 'fm-dot on' }), ` ${f.hits}/${f.relevant} bad days`) : null,
+        f ? h('span', { class: 'pill-s' }, h('i', { class: 'fm-dot on' }), ` before ${f.hits} of ${f.relevant} bad days`) : null,
         f?.status === 'agree' ? h('span', { class: 'pill-s' }, '✓ confirmed') : null,
         it.listed ? h('span', { class: 'pill-s' }, '✕ your allergen') : null),
       h('div', { class: 'fm-where-row' },

@@ -52,7 +52,7 @@ function headline(st) {
         h('div', { class: 'mono' }, 'Pattern', fam.status === 'agree' ? ' · ✓ you confirmed it' : ''),
         h('div', { class: 'hs-big' }, fam.family),
         h('div', { class: 'fm-pills' },
-          h('span', { class: 'pill-s' }, dotsRow, ` ${fam.hits}/${fam.relevant} ${area} bad days`),
+          h('span', { class: 'pill-s' }, dotsRow, ` in use before ${fam.hits} of ${fam.relevant} ${area} bad days`),
           calm ? h('span', { class: 'pill-s ok' }, `✓ doing good since ${fmtDate(lastStop)}`) : null)));
   }
   const count = new Map();
