@@ -50,13 +50,13 @@ export function renderSystem(view) {
        variant('Normal', h('button', { class: 'btn' }, 'Edit')),
        variant('Small', h('button', { class: 'btn small why-btn' }, 'Show me why', h('span', { 'aria-hidden': 'true' }, '→')))], 'row'),
 
-    part('Colour and type', 'Colour only ever means something.', ['Everywhere'],
+    part('Colour and type', 'Colour only ever means something. One typeface, Calibri, for everything.', ['Everywhere'],
       [variant('Amber: a likely trigger', swatch('var(--amber)')),
        variant('Green: fine for you', swatch('var(--ok)')),
        variant('Ink: text and actions', swatch('var(--ink)')),
        variant('Paper: the page', swatch('var(--paper-2)')),
        variant('Words: Calibri', h('span', { class: 'sys-type' }, 'Aa')),
-       variant('Labels: IBM Plex Mono', h('span', { class: 'sys-type', style: 'font-family:var(--mono)' }, 'Aa'))], 'row'));
+       variant('Labels: Calibri, small capitals', h('span', { class: 'sys-type sys-label' }, 'LABEL'))], 'row'));
 }
 
 // ---------- layout ----------
