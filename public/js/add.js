@@ -2,6 +2,7 @@
 import { h, put, s, toast, openSheet, AREAS, todayISO, compressImage } from './ui.js';
 import { store, mutate, searchProducts, enrich } from './store.js';
 import { renderBottle, prepare, rankImages } from './bottle.js';
+import { productAllergens, productHelps } from './rules.js';
 
 export function openAdd({ routineId = null, prefill = '' } = {}) {
   const sh = openSheet({ title: 'Add a product', body: [], foot: [], full: true });
@@ -160,6 +161,16 @@ export function openAdd({ routineId = null, prefill = '' } = {}) {
     drawIngs();
 
     const err = h('div', { class: 'err' });
+    // Checked against your skin profile before you save.
+    const profileCheck = () => {
+      const fake = { area: draft.area, ingredients: ings };
+      const al = productAllergens(fake);
+      const helps = [...productHelps(fake).keys()];
+      return [
+        al.length ? h('div', { class: 'callout' }, h('b', null, 'Heads up: '), `contains ${al.join(' and ').toLowerCase()}, which is on your avoid list.`) : null,
+        helps.length ? h('div', { class: 'callout ok' }, `Good for your ${helps.map((x) => x.toLowerCase()).join(' and ')}.`) : null,
+      ];
+    };
     sh.setBody(
       preview,
       h('div', { class: 'section-h', style: 'margin-top:8px' }, options.length ? 'Pick the right picture' : 'Picture'),
@@ -175,6 +186,7 @@ export function openAdd({ routineId = null, prefill = '' } = {}) {
       h('div', { class: 'row' }, h('div', null, h('label', { class: 'f' }, 'Shelf'), shelf), h('div', null, h('label', { class: 'f' }, 'Used on'), area)),
       h('label', { class: 'f' }, 'When did you start using it?'), started,
       info.summary ? h('p', { class: 'summary', style: 'margin-top:16px' }, info.summary) : null,
+      profileCheck(),
       h('div', { class: 'section-h' }, 'Ingredients'), ingList, err);
     sh.setFoot(
       h('button', { class: 'btn block', onclick: () => stepSearch() }, 'Back'),

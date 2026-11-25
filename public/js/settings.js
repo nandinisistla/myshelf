@@ -46,7 +46,7 @@ function profileForm(onDone, firstTime = false) {
   const goals = h('input', { class: 'input', value: d.goals, placeholder: 'e.g. fade dark spots, calm redness, thicker hair', oninput: (e) => { d.goals = e.target.value; } });
   const err = h('div', { class: 'err' });
   const save = async () => {
-    try { await mutate('profile.set', d); toast('Profile saved'); onDone(); } catch (e) { err.textContent = e.message; }
+    try { await mutate('profile.set', d); toast('Profile saved. Your shelf, For me and History are updated.'); onDone(); } catch (e) { err.textContent = e.message; }
   };
   drawCard(); drawSingle();
   return {

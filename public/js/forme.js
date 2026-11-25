@@ -7,21 +7,25 @@ import { openProduct } from './product.js';
 import { openBadDay } from './reaction.js';
 import { thumb } from './bottle.js';
 import { whyFor } from './why.js';
+import { openSettings, initials } from './settings.js';
+import { productHelps, ALLERGEN_MATCH, FAMILY_TO_ALLERGEN, allergenMatcher, matches } from './rules.js';
 
 const AREA_WORD = { face: 'face', scalp: 'scalp', body: 'body' };
 const AREA_KEY = { Face: 'face', 'Hair & scalp': 'scalp', Body: 'body' };
 const joinWords = (xs) => xs.length < 2 ? xs.join('') : `${xs.slice(0, -1).join(', ')} and ${xs[xs.length - 1]}`;
 
 export function renderForMe(view) {
+  stepNo = 0;
   const st = store.state;
   const ins = st.insights;
   const head = h('section', { class: 'page-head' },
     h('div', { class: 'eyebrow mono' }, `For me · ${ins.reactionCount} bad day${ins.reactionCount === 1 ? '' : 's'} · ${ins.productCount} products`),
     h('h1', { class: 'display' }, 'What your skin is telling you', h('span', { class: 'soft' }, '.')),
-    h('p', { class: 'lede' }, 'Each bad day is checked against what you used the week before.'));
+    h('p', { class: 'lede' }, 'Built from your skin profile and your bad days. Change your profile and this page changes with it.'),
+    profileStrip());
 
   if (ins.reactionCount < 2) {
-    put(view, head, h('div', { class: 'fm-empty' },
+    put(view, head, problemsSection(), h('div', { class: 'fm-empty' },
       h('h3', null, ins.reactionCount ? 'One more bad day and the dots start connecting' : 'Nothing to connect yet'),
       h('p', null, 'When your skin, scalp or body acts up, log it. After two, MyShelf starts comparing what you used before each one.'),
       h('button', { class: 'btn primary', onclick: () => openBadDay() }, 'Log a bad day')),
@@ -29,7 +33,7 @@ export function renderForMe(view) {
     return;
   }
 
-  put(view, head, productsSection(), ingredientsSection(), avoidSection(), safeSection(), leftovers(), disclaimer());
+  put(view, head, problemsSection(), productsSection(), ingredientsSection(), avoidSection(), safeSection(), leftovers(), disclaimer());
 }
 
 // ---------- 1. products in use before bad days ----------
@@ -174,7 +178,8 @@ function leftovers() {
   );
 }
 
-const stepHead = (n, text) => h('div', { class: 'fm-step-head' }, h('span', { class: 'mono' }, n.padStart(2, '0')), h('h2', null, text));
+let stepNo = 0;
+const stepHead = (_n, text) => h('div', { class: 'fm-step-head' }, h('span', { class: 'mono' }, String(++stepNo).padStart(2, '0')), h('h2', null, text));
 
 function disclaimer() {
   return h('p', { class: 'disclaimer' }, 'These are patterns, not a diagnosis. For allergies, a dermatologist can do a patch test to confirm.');
@@ -189,25 +194,12 @@ function elsewhere(f) {
 
 // ---------- 3. better to avoid ----------
 // From your profile (allergens you listed) and from what your skin confirmed.
-const ALLERGEN_MATCH = {
-  'Fragrance': { family: 'Fragrance' },
-  'Essential oils': { family: 'Essential oils & plant extracts' },
-  'Drying alcohol': { family: 'Drying alcohol' },
-  'Sulfates': { name: /sulfate/i },
-  'Parabens': { name: /paraben/i },
-  'Coconut oil': { family: 'Coconut-derived', name: /coco/i },
-  'Silicones': { family: 'Silicones' },
-  'Lanolin': { name: /lanolin/i },
-};
-const FAMILY_TO_ALLERGEN = Object.fromEntries(Object.entries(ALLERGEN_MATCH).filter(([, m]) => m.family).map(([k, m]) => [m.family, k]));
-
 function avoidSection() {
   const st = store.state;
   const ins = st.insights;
   const items = new Map();
   for (const a of st.profile?.allergens || []) {
-    const m = ALLERGEN_MATCH[a] || { name: new RegExp(a.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i') };
-    items.set(a, { label: a, match: m, listed: true, finding: null });
+    items.set(a, { label: a, match: allergenMatcher(a), listed: true, finding: null });
   }
   for (const f of ins.families) {
     if (f.status === 'reject' || !(f.status === 'agree' || f.level === 'strong')) continue;
@@ -218,7 +210,7 @@ function avoidSection() {
   }
   if (!items.size) return null;
 
-  const has = (p, m) => (p.ingredients || []).some((i) => (m.family && i.family === m.family) || (m.name && m.name.test(`${i.inci} ${i.plain}`)));
+  const has = (p, m) => (p.ingredients || []).some((i) => matches(i, m));
   const fineIds = new Set(ins.fineProductIds);
   return h('section', { class: 'fm-step' },
     stepHead('3', 'Better to avoid'),
@@ -241,5 +233,56 @@ function avoidSection() {
               h('div', { class: 'fm-chips' }, watch.map((p) => h('button', { class: 'hs-chip', onclick: () => openProduct(p) }, thumb(p), h('span', null, p.name)))))
           : h('p', { class: 'fm-clear' }, f ? `Nothing you use on your ${AREA_WORD[f.area]} has it any more.` : 'Nothing on your shelf has it.'),
         ok.length ? h('p', { class: 'fm-why muted' }, `It’s also in ${joinWords(ok.map((p) => p.name))}, but your ${joinWords([...new Set(ok.map((p) => AREA_WORD[p.area]))])} ${new Set(ok.map((p) => p.area)).size > 1 ? 'have' : 'has'} been fine with ${ok.length > 1 ? 'them' : 'it'}, so no need to swap.`) : null);
+    })));
+}
+
+// ---------- your profile, at the top ----------
+function profileStrip() {
+  const pr = store.state.profile || {};
+  return h('div', { class: 'fm-profile' },
+    h('span', { class: 'pf-avatar', 'aria-hidden': 'true' }, initials(pr.name) || '·'),
+    h('div', { class: 'fm-profile-txt' },
+      h('div', { class: 'pf-name' }, pr.name || 'Your skin profile'),
+      h('div', { class: 'fm-profile-rows' },
+        h('span', null, h('b', null, 'Skin '), pr.skin_type || 'not set'),
+        h('span', null, h('b', null, 'Problems '), (pr.problems || []).join(', ') || 'none yet'),
+        h('span', null, h('b', null, 'Avoid '), (pr.allergens || []).join(', ') || 'nothing yet'))),
+    h('button', { class: 'btn small', onclick: () => openSettings() }, 'Edit profile'));
+}
+
+// ---------- your skin problems: what on your shelf is working on each ----------
+const LOOK_FOR = {
+  'Redness': 'azelaic acid, centella, panthenol or niacinamide',
+  'Dark spots': 'niacinamide, tranexamic acid, arbutin, vitamin C, azelaic acid, and daily sunscreen',
+  'Breakouts': 'salicylic acid, azelaic acid or niacinamide',
+  'Sensitivity': 'short, fragrance-free formulas with ceramides or centella',
+  'Dryness': 'hyaluronic acid, glycerin, ceramides or squalane',
+  'Oiliness': 'niacinamide, salicylic acid or zinc',
+  'Uneven texture': 'gentle exfoliating acids or a retinoid',
+  'Itchy skin': 'colloidal oat, ceramides or panthenol',
+  'Dandruff': 'zinc pyrithione, ketoconazole or salicylic acid',
+  'Hair thinning': 'peptides, caffeine or rosemary',
+};
+function problemsSection() {
+  const st = store.state;
+  const probs = st.profile?.problems || [];
+  if (!probs.length) {
+    return h('section', { class: 'fm-step' }, stepHead('', 'Your skin problems'),
+      h('p', { class: 'muted' }, 'Add your skin problems to your profile and MyShelf shows what on your shelf is working on each one.'),
+      h('button', { class: 'btn small', onclick: () => openSettings() }, 'Add to profile'));
+  }
+  const live = st.products.filter((p) => !p.stopped);
+  return h('section', { class: 'fm-step' },
+    stepHead('', 'Your skin problems, and what’s working on them'),
+    h('div', { class: 'fm-probs' }, probs.map((pr) => {
+      const helpers = live.map((p) => ({ p, ings: productHelps(p).get(pr) })).filter((x) => x.ings);
+      return h('article', { class: 'fm-prob' + (helpers.length ? '' : ' gap') },
+        h('div', { class: 'fm-prob-head' }, h('h3', null, pr),
+          h('span', { class: 'fm-badge' + (helpers.length ? ' ok' : '') }, helpers.length ? `${helpers.length} product${helpers.length > 1 ? 's' : ''}` : 'Not covered')),
+        helpers.length
+          ? h('div', { class: 'fm-helpers' }, helpers.map(({ p, ings }) => h('button', { class: 'fm-helper', onclick: () => openProduct(p) },
+              thumb(p), h('span', null, h('span', { class: 'nm' }, p.name), h('span', { class: 'via' }, `via ${ings.join(', ').toLowerCase()}`)))))
+          : h('p', { class: 'fm-why' }, 'Nothing on your shelf targets this yet.'),
+        LOOK_FOR[pr] ? h('p', { class: 'fm-look' }, h('span', { class: 'mono' }, 'Look for '), LOOK_FOR[pr]) : null);
     })));
 }

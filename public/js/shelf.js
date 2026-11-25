@@ -6,6 +6,7 @@ import { openProduct } from './product.js';
 import { openAdd } from './add.js';
 import { getHero } from './hero.js';
 import { loadDemo, demoState, onDemoProgress } from './demo.js';
+import { productAllergens, productHelps } from './rules.js';
 
 const pad = (n) => String(n).padStart(2, '0');
 
@@ -70,7 +71,18 @@ function card(p, numberOf) {
     h('div', { class: 'pmeta' },
       h('button', { class: 'pname', onclick: () => openProduct(p) }, p.name),
       h('span', { class: 'pright' }, right)),
-    h('div', { class: 'pdesc', title: desc }, desc));
+    h('div', { class: 'pdesc', title: desc }, desc),
+    tags(p));
+}
+
+// From your skin profile: what it helps with, and anything on your avoid list.
+function tags(p) {
+  const al = productAllergens(p);
+  const helps = [...productHelps(p).keys()];
+  if (!al.length && !helps.length) return null;
+  return h('div', { class: 'ptags' },
+    al.map((a) => h('span', { class: 'ptag avoid' }, `Has ${a.toLowerCase()}`)),
+    helps.slice(0, 2).map((pr) => h('span', { class: 'ptag' }, pr)));
 }
 
 function shortDate(iso) {

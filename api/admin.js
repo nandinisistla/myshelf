@@ -79,9 +79,18 @@ async function demo(action, body, todayISO) {
   }
 
   if (action === 'demo.finish') {
-    // Her skin profile and the trigger she confirmed.
+    // The story starts with her skin profile (June 1, no known allergens yet). On Oct 9, after
+    // MyShelf showed the pattern, she confirmed fragrance and added it to her allergens.
+    const backdateLast = async (kind, when) =>
+      q(`update events set at = $1 where id = (select max(id) from events where kind = $2)`, [when, kind]);
+    await setProfile({ ...DEMO_PROFILE, allergens: [] }, 'demo');
+    await backdateLast('profile', at('2026-06-01', '08:05'));
+    for (const st of DEMO_STATUSES) {
+      await setInsightStatus(st.family, st.status, 'demo');
+      await backdateLast('insight', at('2026-10-09', '19:30'));
+    }
     await setProfile(DEMO_PROFILE, 'demo');
-    for (const st of DEMO_STATUSES) await setInsightStatus(st.family, st.status, 'demo');
+    await backdateLast('profile', at('2026-10-09', '19:35'));
     // Her own products: give them start dates that fit the story, if they still have the default.
     for (const o of DEMO_OWN_DATES) {
       const rows = await q(`select id, name, started, routine_id from products where demo = false and lower(name) like $1`, [`%${o.match}%`]);
@@ -115,6 +124,7 @@ async function demo(action, body, todayISO) {
       await q(`delete from events where data->>'reactionId' = any($1::text[])`, [reacts]);
       await q(`delete from reactions where demo = true`);
     }
+    await q(`delete from events where source = 'demo' and kind in ('profile', 'insight')`);
     return getState(todayISO);
   }
   throw new UserError('Unknown action.');

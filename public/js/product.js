@@ -1,4 +1,5 @@
 // Product page: the bottle, when you used it, and every ingredient in plain words.
+import { verdict, productAllergens, productHelps } from './rules.js';
 import { h, put, toast, confirmSheet, openSheet, fmtDate, howLong, AREAS, compressImage } from './ui.js';
 import { store, mutate, S, onChange, findPhotos } from './store.js';
 import { renderBottle, rankImages, imageSrc, scoreImage } from './bottle.js';
@@ -22,6 +23,9 @@ export function openProduct(prod) {
     const hasSuspect = (p.ingredients || []).filter((i) => sus.has(i.family));
     const susFamilies = [...new Set(hasSuspect.map((i) => i.family))];
     const fine = st.insights.fineProductIds.includes(p.id);
+    // From your skin profile: allergens in it, and which of your skin problems it helps.
+    const allergensIn = productAllergens(p);
+    const helps = productHelps(p);
 
     const status = p.stopped
       ? h('span', { class: 'pill' }, `Used ${fmtDate(p.started)} – ${fmtDate(p.stopped)}`)
@@ -56,15 +60,21 @@ export function openProduct(prod) {
 
     const list = p.ingredients || [];
     const ingList = mode === 'plain'
-      ? list.map((i) => h('div', { class: `ing ${sus.has(i.family) ? 'suspect' : i.flag}` },
-          h('span', { class: 'mark', 'aria-hidden': 'true' }),
-          h('div', null,
-            h('div', { class: 'pn' }, i.plain || i.inci),
-            i.plain && i.plain !== i.inci ? h('div', { class: 'inci' }, i.inci) : null,
-            i.does ? h('div', { class: 'does' }, i.does) : null,
-            i.for_you ? h('div', { class: 'foryou' }, h('b', null, 'For you: '), i.for_you) : null,
-            h('div', { class: 'fam' }, h('span', { class: 'pill' + (sus.has(i.family) ? ' amber' : '') }, i.family),
-              sus.has(i.family) ? h('span', { class: 'pill amber', style: 'margin-left:6px' }, 'possible trigger') : null))))
+      ? list.map((i) => {
+          const v = verdict(i, p);
+          const trig = sus.has(i.family);
+          const cls = trig || v.flag === 'avoid' ? 'suspect' : v.flag === 'watch' ? 'watch' : v.flag;
+          return h('div', { class: `ing ${cls}` },
+            h('span', { class: 'mark', 'aria-hidden': 'true' }),
+            h('div', null,
+              h('div', { class: 'pn' }, i.plain || i.inci),
+              i.plain && i.plain !== i.inci ? h('div', { class: 'inci' }, i.inci) : null,
+              i.does ? h('div', { class: 'does' }, i.does) : null,
+              v.note ? h('div', { class: 'foryou' }, h('b', null, 'For you: '), v.note) : null,
+              h('div', { class: 'fam' }, h('span', { class: 'pill' + (trig || v.flag === 'avoid' ? ' amber' : '') }, i.family),
+                v.flag === 'avoid' ? h('span', { class: 'pill amber', style: 'margin-left:6px' }, 'on your avoid list') : null,
+                trig ? h('span', { class: 'pill amber', style: 'margin-left:6px' }, 'possible trigger') : null)));
+        })
       : h('p', { class: 'label-view' }, list.map((i, n) => [h('span', { class: sus.has(i.family) ? 'w' : '' }, i.inci), n < list.length - 1 ? ', ' : '']));
 
     // Warn when the photo is too small to look sharp.
@@ -86,6 +96,8 @@ export function openProduct(prod) {
         h('div', { class: 'p-meta' }, [p.brand, AREAS[p.area]].filter(Boolean).join(' · ')),
         h('div', { class: 'p-status' }, status,
           fine ? h('span', { class: 'pill ok' }, 'Seems fine for you') : null,
+          [...helps.keys()].slice(0, 2).map((pr) => h('span', { class: 'pill ok' }, `Helps with ${pr.toLowerCase()}`)),
+          allergensIn.map((a) => h('span', { class: 'pill amber' }, `Has ${a.toLowerCase()}`)),
           susFamilies.length ? h('span', { class: 'pill amber' }, 'Has a possible trigger') : null)),
       lowRes,
       controls,
@@ -94,6 +106,9 @@ export function openProduct(prod) {
           h('button', { class: mode === 'plain' ? 'on' : '', onclick: () => { mode = 'plain'; render(); } }, 'Plain words'),
           h('button', { class: mode === 'label' ? 'on' : '', onclick: () => { mode = 'label'; render(); } }, 'Label'))),
       p.summary ? h('p', { class: 'summary' }, p.summary) : null,
+      allergensIn.length ? h('div', { class: 'callout' }, `Contains ${allergensIn.join(' and ').toLowerCase()}, which is on your avoid list.`,
+        fine ? ` Your ${p.area === 'scalp' ? 'scalp' : p.area} has been fine with this product so far, so there’s no need to swap it.` : p.stopped ? '' : ' Worth finding a version without it.') : null,
+      helps.size ? h('div', { class: 'callout ok' }, [...helps].map(([pr, ings]) => `Helps with ${pr.toLowerCase()} (${ings.join(', ').toLowerCase()}).`).join(' ')) : null,
       susFamilies.length ? h('div', { class: 'callout' }, `Contains ${susFamilies.slice(0, 2).join(' and ').toLowerCase()}${susFamilies.length > 2 ? ` (+${susFamilies.length - 2} more)` : ''}, which keeps showing up before your bad days. See “For me” for the evidence.`) : null,
       list.length ? ingList : h('div', { class: 'ai-note' }, 'No ingredient list yet. Tap “Edit list” to paste one.'),
       h('div', { class: 'sources' },
