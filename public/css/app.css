@@ -154,7 +154,11 @@ textarea.input { resize: vertical; min-height: 84px; }
 .tile .bottle .stage { width: 100%; height: 100%; }
 .tile .bottle .face svg { filter: drop-shadow(0 14px 14px rgba(0,0,0,.16)) drop-shadow(0 2px 3px rgba(0,0,0,.10)); }
 .tile .tdot { position: absolute; top: 18px; left: 18px; width: 7px; height: 7px; border-radius: 50%; background: var(--amber); z-index: 2; }
-.tile.stopped .bottle .face.front { filter: grayscale(1); opacity: .5; }
+.tile.stopped .bottle .face.front svg { filter: grayscale(1); }
+/* Past products: fade them with a veil of the tile's own colour. (Fading the photo itself
+   breaks its blend, and the white photo box shows.) */
+.tile.stopped::before { content: ''; position: absolute; inset: 0; background: rgba(230, 229, 224, .6);
+  -webkit-backdrop-filter: grayscale(1); backdrop-filter: grayscale(1); pointer-events: none; z-index: 1; }
 .pmeta { display: flex; justify-content: space-between; gap: 12px; margin-top: 12px; align-items: baseline; }
 .pname { font-size: 19px; line-height: 1.2; letter-spacing: -.005em; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; background: none; border: 0; padding: 0; text-align: left; cursor: pointer; }
 .pright { font-family: var(--mono); font-size: 11px; color: var(--muted); white-space: nowrap; }
@@ -518,7 +522,10 @@ button.rail-item:hover:not(.on) .n { text-decoration: underline; text-underline-
 .hs-thumb img, .hs-thumb svg { max-width: 100%; max-height: 100%; object-fit: contain; }
 .hs-thumb.blend img { mix-blend-mode: multiply; }
 .hs-thumb:not(.blend) img { border-radius: 8px; }
-.hs-thumb.past { filter: grayscale(1); opacity: .6; }
+/* Past products: a veil of the background colour on top, so the photo still blends. */
+.hs-thumb.past::after { content: ''; position: absolute; inset: 0; pointer-events: none;
+  background: color-mix(in srgb, var(--veil, var(--paper)) 55%, transparent);
+  -webkit-backdrop-filter: grayscale(1); backdrop-filter: grayscale(1); }
 .hs-log { margin: 56px 0 20px; }
 .hs-log summary { cursor: pointer; font-size: 11px; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); padding: 12px 0; border-top: 1px solid var(--rule); }
 .hs-log summary:hover { color: var(--ink); }
@@ -742,7 +749,7 @@ button.rail-item:hover:not(.on) .n { text-decoration: underline; text-underline-
 .fm-thumb { border: 1px solid var(--hair); background: var(--paper-2); border-radius: 12px; padding: 4px; cursor: pointer; width: 58px; height: 68px; display: grid; place-items: center; transition: translate .25s, border-color .2s; }
 .fm-thumb:hover { translate: 0 -2px; border-color: var(--rule); }
 .fm-thumb .hs-thumb.lg { width: 48px; height: 58px; }
-.fm-thumb.past { opacity: .55; filter: grayscale(.6); }
+.fm-thumb { --veil: var(--paper-2); }
 .fm-frac { font-size: 15px; font-variant-numeric: tabular-nums; }
 .fm-pills { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
 .pill-s { display: inline-flex; align-items: center; gap: 4px; font-family: var(--mono); font-size: 10.5px; letter-spacing: .05em; border: 1px solid var(--hair); border-radius: 999px; padding: 3px 9px; color: var(--muted); white-space: nowrap; }
