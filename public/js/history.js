@@ -67,6 +67,12 @@ function feed(st) {
   const items = [];
   for (const r of st.reactions) items.push({ date: r.date, kind: 'bad', order: 0, r });
   if (!onlyBad) items.push(...profileItems(st));
+  // Moving a product to another shelf is part of the story too.
+  if (!onlyBad) for (const e of st.events) {
+    const m = e.kind === 'product.update' && /moved to ([^,]+)/.exec(e.summary || '');
+    const p = m && st.products.find((x) => x.id === e.data?.productId);
+    if (p) items.push({ date: localDay(e.at), kind: 'move', order: 0.7, p, to: m[1] });
+  }
   if (!onlyBad) for (const p of st.products) {
     if (p.stopped) items.push({ date: p.stopped, kind: 'stop', order: 1, p });
     if (p.started) items.push({ date: p.started, kind: 'start', order: 2, p });
@@ -159,7 +165,9 @@ function entry(it, st) {
     h('button', { class: 'hs-body hs-product', onclick: () => openProduct(p) },
       thumb(p),
       h('div', null,
-        h('div', { class: 'hs-line' }, stop ? 'Stopped ' : today ? 'Added ' : 'Started ', h('b', null, p.name)),
+        h('div', { class: 'hs-line' }, it.kind === 'move'
+          ? ['Moved ', h('b', null, p.name), it.to === 'no shelf' ? ' off your shelves' : ` to your ${it.to} shelf`]
+          : [stop ? 'Stopped ' : today ? 'Added ' : 'Started ', h('b', null, p.name)]),
         h('div', { class: 'mono' }, [shelf(p) ? `${shelf(p)} shelf` : AREAS[p.area],
           stop && p.started ? `used for ${howLong(p.started, p.stopped)}` : null].filter(Boolean).join(' · ')))));
 }

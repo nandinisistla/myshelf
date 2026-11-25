@@ -933,3 +933,17 @@ button.rail-item:hover:not(.on) .n { text-decoration: underline; text-underline-
 .site-foot a { font-family: var(--mono); font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); text-decoration: none; }
 .site-foot a:hover { color: var(--ink); }
 .chat-mode .site-foot { display: none; }
+
+/* ---------- drag a product to another shelf ---------- */
+.pcard[data-id] .tile { cursor: grab; }
+body.dragging-card, body.dragging-card * { cursor: grabbing !important; user-select: none; -webkit-user-select: none; }
+.drag-ghost { position: fixed; z-index: 300; margin: 0; pointer-events: none; transform-origin: 40% 30%;
+  filter: drop-shadow(0 24px 30px rgba(0,0,0,.16)) drop-shadow(0 4px 8px rgba(0,0,0,.08)); }
+.drag-ghost .pmeta, .drag-ghost .pdesc, .drag-ghost .ptags { opacity: 0; }
+.pcard.drag-src { opacity: .28; transition: opacity .2s; }
+.pcard.drag-src .tile { outline: 1.5px dashed var(--hair); outline-offset: -1.5px; }
+.shelf-group .grid { border-radius: 20px; transition: background .25s, box-shadow .25s; }
+.shelf-group.drop-on .grid { background: rgba(192,138,46,.07); box-shadow: 0 0 0 1.5px var(--amber), 0 0 0 12px rgba(192,138,46,.07); }
+.shelf-group.drop-on .group-head h2, .shelf-group.drop-on .group-head h2 button { color: var(--amber-ink); }
+.pcard.just-dropped .tile { animation: drop-in .6s cubic-bezier(.3,1.5,.5,1); }
+@keyframes drop-in { 0% { transform: scale(.92); } 60% { transform: scale(1.03); } 100% { transform: none; } }

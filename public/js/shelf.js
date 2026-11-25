@@ -6,6 +6,7 @@ import { openProduct } from './product.js';
 import { openAdd } from './add.js';
 import { getHero } from './hero.js';
 import { productAllergens, productHelps, isWorking } from './rules.js';
+import { enableShelfDrag } from './dragshelf.js';
 
 const pad = (n) => String(n).padStart(2, '0');
 
@@ -31,13 +32,14 @@ export function renderShelf(view) {
     h('div', { class: 'grid', style: 'margin-top:18px' }, past.map((p) => productCard(p, numberOf)))) : null;
 
   put(view, getHero(), head, groups, pastBlock);
+  enableShelfDrag(view);
 }
 
 function group(r, n, products, numberOf) {
   const nameEl = r.id
     ? h('h2', null, h('button', { title: 'Rename', onclick: (e) => renameInline(e.currentTarget.parentElement, r) }, r.name))
     : h('h2', null, r.name);
-  return h('section', { class: 'shelf-group', 'aria-label': `${r.name} shelf` },
+  return h('section', { class: 'shelf-group', 'aria-label': `${r.name} shelf`, 'data-routine': r.id || '' },
     h('div', { class: 'group-head' },
       nameEl,
       h('span', { class: 'rule' }),
@@ -59,7 +61,7 @@ export function productCard(p, numberOf) {
     renderBottle(p, { onOpen: openProduct, showName: false }));
   const right = p.stopped ? `Until ${shortDate(p.stopped)}` : howLong(p.started, st.today);
   const desc = [p.brand, p.summary].filter(Boolean).join(' · ') || p.brand || '';
-  return h('article', { class: 'pcard' },
+  return h('article', { class: 'pcard', 'data-id': p.stopped ? null : p.id },
     tile,
     h('div', { class: 'pmeta' },
       h('button', { class: 'pname', onclick: () => openProduct(p) }, p.name),
