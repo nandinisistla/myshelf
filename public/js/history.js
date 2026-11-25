@@ -35,10 +35,28 @@ export function renderHistory(view) {
       log()));
 }
 
-// The one thing worth knowing, in a sentence.
+// The one thing worth knowing, in a sentence: the clearest ingredient pattern if there is
+// one, otherwise the product that keeps showing up.
 function headline(st) {
   const R = st.reactions;
   if (R.length < 2) return null;
+  const fam = st.insights.families.find((f) => f.status !== 'reject' && (f.status === 'agree' || f.level === 'strong'));
+  if (fam) {
+    const area = AREA_WORD[fam.area];
+    const ps = (fam.areaProductIds || []).map((id) => st.products.find((p) => p.id === id)).filter(Boolean);
+    const stillUsing = ps.some((p) => !p.stopped);
+    const lastStop = ps.map((p) => p.stopped).filter(Boolean).sort().pop();
+    const after = lastStop ? R.filter((r) => r.area === fam.area && r.date > lastStop).length : 1;
+    const calm = !stillUsing && lastStop && after === 0 && daysBetween(lastStop, st.today) >= 14;
+    const top = ps[0];
+    return h('button', { class: 'hs-headline', onclick: () => { location.hash = '#forme'; } },
+      top ? thumb(top, 'lg') : null,
+      h('div', null,
+        h('div', { class: 'mono' }, fam.status === 'agree' ? 'Pattern · you confirmed it' : 'Pattern'),
+        h('p', null,
+          h('b', null, fam.family), ` was in what you used before ${fam.hits === fam.relevant ? 'every one' : fam.hits} of your ${fam.relevant} ${area} bad days.`,
+          calm ? ` Since you cut it out on ${fmtDate(lastStop)}, your ${area} hasn’t acted up once.` : '')));
+  }
   const count = new Map();
   for (const w of st.insights.windows || []) for (const id of w.productIds) count.set(id, (count.get(id) || 0) + 1);
   let best = null;

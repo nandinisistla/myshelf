@@ -25,11 +25,11 @@ export function renderForMe(view) {
       h('h3', null, ins.reactionCount ? 'One more bad day and the dots start connecting' : 'Nothing to connect yet'),
       h('p', null, 'When your skin, scalp or body acts up, log it. After two, MyShelf starts comparing what you used before each one.'),
       h('button', { class: 'btn primary', onclick: () => openBadDay() }, 'Log a bad day')),
-    safeSection(), disclaimer());
+    avoidSection(), safeSection(), disclaimer());
     return;
   }
 
-  put(view, head, productsSection(), ingredientsSection(), safeSection(), leftovers(), disclaimer());
+  put(view, head, productsSection(), ingredientsSection(), avoidSection(), safeSection(), leftovers(), disclaimer());
 }
 
 // ---------- 1. products in use before bad days ----------
@@ -95,7 +95,7 @@ const rank = (f) => (f.status === 'agree' ? 0 : f.level === 'strong' ? 1 : 2);
 
 function ingredientCard(f, compact) {
   const st = store.state;
-  const prods = f.productIds.map((id) => S.product(id)).filter(Boolean);
+  const prods = (f.areaProductIds || f.productIds).map((id) => S.product(id)).filter(Boolean);
   const fineIds = new Set(st.insights.fineProductIds);
   const fineOnes = prods.filter((p) => fineIds.has(p.id));
   const live = prods.filter((p) => !p.stopped);
@@ -125,11 +125,12 @@ function ingredientCard(f, compact) {
       h('span', null, before, h('span', { class: 'muted' }, ` · ${doubt}`)))];
   const rows = [
     ['Why it can irritate', h('span', null, whyFor(f.family), names.length > 1 ? h('span', { class: 'muted' }, ` Always comes with ${joinWords(names.slice(1).map((x) => x.toLowerCase()))}, so they can’t be told apart yet.`) : null)],
+    f.fineElsewhereIds?.length ? ['Elsewhere', elsewhere(f)] : null,
     [live.length ? 'Still in' : 'Was in', h('div', { class: 'fm-chips' }, (live.length ? live : prods).map((p) => h('button', { class: 'hs-chip', onclick: () => openProduct(p) }, thumb(p), h('span', null, p.name))))],
     ['Try this', tryThis],
   ];
   const rest = [
-    h('dl', { class: 'fm-rows' }, rows.map(([k, v]) => [h('dt', null, k), h('dd', null, v)])),
+    h('dl', { class: 'fm-rows' }, rows.filter(Boolean).map(([k, v]) => [h('dt', null, k), h('dd', null, v)])),
     h('div', { class: 'fm-ask' },
       h('span', null, 'Sound right to you?'),
       h('button', { class: 'chip' + (f.status === 'agree' ? ' on' : ''), onclick: () => choose('agree') }, 'Yes'),
@@ -155,7 +156,7 @@ function safeSection() {
   const fine = st.insights.fineProductIds.map((id) => S.product(id)).filter(Boolean);
   if (!fine.length) return null;
   return h('section', { class: 'fm-step' },
-    stepHead('3', 'Safe for you so far'),
+    stepHead('4', 'Safe for you so far'),
     h('p', { class: 'fm-intro' }, 'Used for at least two weeks, with no bad day on that area while you were using them.'),
     h('div', { class: 'fm-safe' }, fine.map((p) => h('button', { class: 'fm-safe-item', onclick: () => openProduct(p) },
       thumb(p, 'lg'), h('span', null, p.name)))));
@@ -177,4 +178,68 @@ const stepHead = (n, text) => h('div', { class: 'fm-step-head' }, h('span', { cl
 
 function disclaimer() {
   return h('p', { class: 'disclaimer' }, 'These are patterns, not a diagnosis. For allergies, a dermatologist can do a patch test to confirm.');
+}
+
+// "Your body is fine with it": the same ingredient in products for other areas that caused no trouble.
+function elsewhere(f) {
+  const ps = f.fineElsewhereIds.map((id) => S.product(id)).filter(Boolean);
+  const areas = joinWords([...new Set(ps.map((p) => AREA_WORD[p.area]))]);
+  return `Your ${areas} ${areas.includes(' and ') ? 'seem' : 'seems'} fine with it: ${joinWords(ps.map((p) => p.name))}.`;
+}
+
+// ---------- 3. better to avoid ----------
+// From your profile (allergens you listed) and from what your skin confirmed.
+const ALLERGEN_MATCH = {
+  'Fragrance': { family: 'Fragrance' },
+  'Essential oils': { family: 'Essential oils & plant extracts' },
+  'Drying alcohol': { family: 'Drying alcohol' },
+  'Sulfates': { name: /sulfate/i },
+  'Parabens': { name: /paraben/i },
+  'Coconut oil': { family: 'Coconut-derived', name: /coco/i },
+  'Silicones': { family: 'Silicones' },
+  'Lanolin': { name: /lanolin/i },
+};
+const FAMILY_TO_ALLERGEN = Object.fromEntries(Object.entries(ALLERGEN_MATCH).filter(([, m]) => m.family).map(([k, m]) => [m.family, k]));
+
+function avoidSection() {
+  const st = store.state;
+  const ins = st.insights;
+  const items = new Map();
+  for (const a of st.profile?.allergens || []) {
+    const m = ALLERGEN_MATCH[a] || { name: new RegExp(a.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i') };
+    items.set(a, { label: a, match: m, listed: true, finding: null });
+  }
+  for (const f of ins.families) {
+    if (f.status === 'reject' || !(f.status === 'agree' || f.level === 'strong')) continue;
+    const key = FAMILY_TO_ALLERGEN[f.family] || f.family;
+    const it = items.get(key) || { label: key, match: { family: f.family }, listed: false };
+    it.finding = f;
+    items.set(key, it);
+  }
+  if (!items.size) return null;
+
+  const has = (p, m) => (p.ingredients || []).some((i) => (m.family && i.family === m.family) || (m.name && m.name.test(`${i.inci} ${i.plain}`)));
+  const fineIds = new Set(ins.fineProductIds);
+  return h('section', { class: 'fm-step' },
+    stepHead('3', 'Better to avoid'),
+    h('p', { class: 'fm-intro' }, 'From the allergens in your profile and what your skin has shown. MyShelf flags these when you add something new.'),
+    h('div', { class: 'fm-avoid' }, [...items.values()].map((it) => {
+      const f = it.finding;
+      const live = st.products.filter((p) => !p.stopped && has(p, it.match));
+      const reasons = [
+        it.listed ? 'You listed it as an allergen.' : null,
+        f ? `Before ${f.hits === f.relevant ? `all ${f.relevant}` : `${f.hits} of ${f.relevant}`} of your ${AREA_WORD[f.area]} bad days${f.status === 'agree' ? ', and you confirmed it' : ''}.` : null,
+      ].filter(Boolean).join(' ');
+      // Products for other areas that have been fine with it are worth keeping.
+      const ok = live.filter((p) => f && p.area !== f.area && fineIds.has(p.id));
+      const watch = live.filter((p) => !ok.includes(p));
+      return h('article', { class: 'fm-avoid-item' },
+        h('div', { class: 'fm-avoid-head' }, h('h3', null, it.label), h('span', { class: 'fm-badge on' }, 'Avoid')),
+        h('p', { class: 'fm-why' }, reasons, ' ', h('span', { class: 'muted' }, whyFor(it.match.family || it.label))),
+        watch.length
+          ? h('div', { class: 'fm-where' }, h('div', { class: 'mono warn' }, f ? `Still on your ${AREA_WORD[f.area]} shelf` : 'Still on your shelf'),
+              h('div', { class: 'fm-chips' }, watch.map((p) => h('button', { class: 'hs-chip', onclick: () => openProduct(p) }, thumb(p), h('span', null, p.name)))))
+          : h('p', { class: 'fm-clear' }, f ? `Nothing you use on your ${AREA_WORD[f.area]} has it any more.` : 'Nothing on your shelf has it.'),
+        ok.length ? h('p', { class: 'fm-why muted' }, `It’s also in ${joinWords(ok.map((p) => p.name))}, but your ${joinWords([...new Set(ok.map((p) => AREA_WORD[p.area]))])} ${new Set(ok.map((p) => p.area)).size > 1 ? 'have' : 'has'} been fine with ${ok.length > 1 ? 'them' : 'it'}, so no need to swap.`) : null);
+    })));
 }

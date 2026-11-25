@@ -3,27 +3,61 @@ import { h, toast, openSheet, confirmSheet } from './ui.js';
 import { store, mutate, admin } from './store.js';
 import { loadDemo, clearDemo } from './demo.js';
 
-const SKIN = ['Dry', 'Oily', 'Combination', 'Normal', 'Sensitive'];
+const SKIN = ['Dry', 'Oily', 'Combination', 'Normal'];
+export const PROBLEMS = ['Redness', 'Dark spots', 'Breakouts', 'Sensitivity', 'Dryness', 'Oiliness', 'Uneven texture', 'Itchy skin', 'Dandruff', 'Hair thinning'];
+export const ALLERGENS = ['Fragrance', 'Essential oils', 'Drying alcohol', 'Sulfates', 'Parabens', 'Coconut oil', 'Silicones', 'Lanolin'];
+
+export const initials = (name) => String(name || '').trim().split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0].toUpperCase()).join('');
 
 function profileForm(onDone, firstTime = false) {
   const p = store.state.profile || {};
-  const d = { skin_type: p.skin_type || '', goals: p.goals || '', avoid: p.avoid || '' };
-  const chips = h('div', { class: 'chips', role: 'radiogroup', 'aria-label': 'Skin type' });
-  const drawChips = () => chips.replaceChildren(...SKIN.map((t) =>
-    h('button', { class: 'chip' + (d.skin_type === t ? ' on' : ''), role: 'radio', 'aria-checked': String(d.skin_type === t), onclick: () => { d.skin_type = t; drawChips(); } }, t)));
-  drawChips();
-  const goals = h('input', { class: 'input', value: d.goals, placeholder: 'e.g. fade dark spots, calm redness, healthy scalp', oninput: (e) => { d.goals = e.target.value; } });
-  const avoid = h('input', { class: 'input', value: d.avoid, placeholder: 'e.g. fragrance, coconut oil (leave empty if unsure)', oninput: (e) => { d.avoid = e.target.value; } });
+  const d = {
+    name: p.name || '', skin_type: p.skin_type || '', goals: p.goals || '',
+    problems: [...(p.problems || [])], allergens: [...(p.allergens || (p.avoid ? String(p.avoid).split(',').map((x) => x.trim()).filter(Boolean) : []))],
+  };
+  const name = h('input', { class: 'input', value: d.name, placeholder: 'Your name', autocomplete: 'name', oninput: (e) => { d.name = e.target.value; drawCard(); } });
+  const card = h('div', { class: 'pf-card' });
+  const drawCard = () => card.replaceChildren(
+    h('span', { class: 'pf-avatar', 'aria-hidden': 'true' }, initials(d.name) || '·'),
+    h('div', null, h('div', { class: 'pf-name' }, d.name || 'Your name'),
+      h('div', { class: 'pf-sub' }, [d.skin_type ? `${d.skin_type} skin` : null, ...d.problems.slice(0, 3)].filter(Boolean).join(' · ') || 'Fill in your skin profile below')));
+
+  const single = h('div', { class: 'chips', role: 'radiogroup', 'aria-label': 'Skin type' });
+  const drawSingle = () => single.replaceChildren(...SKIN.map((t) =>
+    h('button', { class: 'chip' + (d.skin_type === t ? ' on' : ''), role: 'radio', 'aria-checked': String(d.skin_type === t), onclick: () => { d.skin_type = t; drawSingle(); drawCard(); } }, t)));
+
+  const multi = (key, options, label) => {
+    const box = h('div', { class: 'chips', role: 'group', 'aria-label': label });
+    const draw = () => box.replaceChildren(...[...new Set([...options, ...d[key]])].map((t) => {
+      const on = d[key].includes(t);
+      return h('button', { class: 'chip' + (on ? ' on' : ''), 'aria-pressed': String(on), onclick: () => {
+        d[key] = on ? d[key].filter((x) => x !== t) : [...d[key], t]; draw(); drawCard();
+      } }, t);
+    }));
+    draw();
+    return { box, draw };
+  };
+  const probs = multi('problems', PROBLEMS, 'Skin problems');
+  const alls = multi('allergens', ALLERGENS, 'Allergens');
+  const other = h('input', { class: 'input', placeholder: 'Something else? Type it and press Enter', onkeydown: (e) => {
+    if (e.key !== 'Enter' || !e.target.value.trim()) return;
+    d.allergens = [...new Set([...d.allergens, e.target.value.trim()])]; e.target.value = ''; alls.draw();
+  } });
+  const goals = h('input', { class: 'input', value: d.goals, placeholder: 'e.g. fade dark spots, calm redness, thicker hair', oninput: (e) => { d.goals = e.target.value; } });
   const err = h('div', { class: 'err' });
   const save = async () => {
     try { await mutate('profile.set', d); toast('Profile saved'); onDone(); } catch (e) { err.textContent = e.message; }
   };
+  drawCard(); drawSingle();
   return {
     body: [
-      firstTime ? h('p', { class: 'muted' }, 'Three quick questions so every ingredient can be explained for your skin. You can change this anytime.') : null,
-      h('label', { class: 'f' }, '1. Your skin type'), chips,
-      h('label', { class: 'f' }, '2. What do you want from your skincare?'), goals,
-      h('label', { class: 'f' }, '3. Anything you know you react to or want to avoid?'), avoid, err,
+      card,
+      firstTime ? h('p', { class: 'muted' }, 'A few quick questions so every ingredient can be explained for your skin. You can change this anytime.') : null,
+      h('label', { class: 'f' }, 'Name'), name,
+      h('label', { class: 'f' }, 'Skin type'), single,
+      h('label', { class: 'f' }, 'Skin problems'), probs.box,
+      h('label', { class: 'f' }, 'Allergens and things you react to'), alls.box, other,
+      h('label', { class: 'f' }, 'What you want from your skincare'), goals, err,
     ],
     save,
   };
@@ -65,7 +99,7 @@ export function openSettings() {
         h('button', { class: 'btn small', onclick: () => run('save', 'Backup saved') }, 'Save backup'),
         h('button', { class: 'btn small', onclick: () => run('restore', 'Shelf reset to your backup', 'Reset the whole app to your saved backup? Changes made since then will be lost.') }, 'Reset to backup')),
       h('div', { class: 'section-h' }, 'Demo history'),
-      h('p', { class: 'muted small' }, 'Fill MyShelf with five months of example history: your routine dated back to the summer, three past products, and eight bad days, so the timeline and patterns have something to show. Each product is looked up for real, so it takes a minute or two. Your own products stay as they are, and you can remove the demo in one click.'),
+      h('p', { class: 'muted small' }, 'Fills MyShelf with Nandini’s demo story: a summer routine with fragranced face products, eight bad days, the switch to a fragrance-free routine in October, and calm skin since. Each product photo is looked up for real, so it takes a minute or two. You can remove the demo in one click.'),
       demoStatus,
       h('div', { class: 'p-actions' },
         h('button', { class: 'btn small primary', onclick: async (e) => {
@@ -75,6 +109,15 @@ export function openSettings() {
           } catch (ex) { ownerErr.textContent = ex.message; }
           btn.disabled = false;
         } }, 'Add demo history'),
+        h('button', { class: 'btn small', onclick: async (e) => {
+          if (!(await confirmSheet('Replace the demo with a fresh copy of the demo story? Your own entries stay.', 'Rebuild'))) return;
+          const btn = e.currentTarget; btn.disabled = true; ownerErr.textContent = '';
+          try {
+            await clearDemo(key.value);
+            await loadDemo(key.value, (msg, n, total) => { demoStatus.textContent = total ? `${msg} · ${n} of ${total}` : msg; toast(msg); });
+          } catch (ex) { ownerErr.textContent = ex.message; }
+          btn.disabled = false;
+        } }, 'Rebuild demo story'),
         h('button', { class: 'btn small', onclick: async () => {
           if (!(await confirmSheet('Remove all demo products and demo bad days? Your own entries stay.', 'Remove'))) return;
           try { await clearDemo(key.value); toast('Demo history removed'); demoStatus.textContent = ''; } catch (ex) { ownerErr.textContent = ex.message; }

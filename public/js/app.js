@@ -6,7 +6,7 @@ import { renderHistory } from './history.js';
 import { renderForMe } from './forme.js';
 import { renderChat, leaveChat } from './chat.js';
 import { openBadDay } from './reaction.js';
-import { openOnboarding, openSettings } from './settings.js';
+import { openOnboarding, openSettings, initials } from './settings.js';
 import { findPhotos } from './store.js';
 import { imageSrc, scoreImage } from './bottle.js';
 
@@ -42,6 +42,16 @@ window.addEventListener('hashchange', () => render(false));
 onChange(() => render(true));
 document.getElementById('badDayBtn').addEventListener('click', () => openBadDay());
 document.getElementById('profileBtn').addEventListener('click', () => openSettings());
+// Show your initials on the profile button once you have a name.
+onChange((st) => {
+  const btn = document.getElementById('profileBtn');
+  const ini = initials(st?.profile?.name);
+  btn.classList.toggle('has-name', Boolean(ini));
+  btn.setAttribute('aria-label', ini ? `${st.profile.name}: skin profile and settings` : 'Skin profile and settings');
+  let tag = btn.querySelector('.ini');
+  if (ini) { if (!tag) { tag = document.createElement('span'); tag.className = 'ini'; btn.append(tag); } tag.textContent = ini; }
+  else if (tag) tag.remove();
+});
 
 async function start() {
   put(view, h('div', { class: 'loading' }, h('div', null, h('span', { class: 'spinner' }), '  Opening your shelf…')));

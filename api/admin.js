@@ -2,8 +2,8 @@
 // Protected by OWNER_KEY (set it in Vercel → Settings → Environment Variables).
 import { handler, today } from '../lib/http.js';
 import { q, TABLES } from '../lib/db.js';
-import { getState, logEvent, addProduct, stopProduct, addReaction, UserError } from '../lib/core.js';
-import { DEMO_PRODUCTS, DEMO_REACTIONS } from '../lib/demo.js';
+import { getState, logEvent, addProduct, stopProduct, addReaction, setProfile, setInsightStatus, fmtDate, UserError } from '../lib/core.js';
+import { DEMO_PRODUCTS, DEMO_REACTIONS, DEMO_PROFILE, DEMO_STATUSES, DEMO_OWN_DATES } from '../lib/demo.js';
 
 export const config = { maxDuration: 60 };
 
@@ -47,7 +47,7 @@ async function demo(action, body, todayISO) {
   if (action === 'demo.plan') {
     // Which demo products aren't on MyShelf yet (so nothing is added twice).
     const have = await q(`select lower(name) as name, lower(coalesce(brand, '')) as brand from products`);
-    const todo = DEMO_PRODUCTS.map((d, index) => ({ index, name: d.name, brand: d.brand }))
+    const todo = DEMO_PRODUCTS.map((d, index) => ({ index, name: d.name, brand: d.brand, curated: Boolean(d.ingredients) }))
       .filter((d) => !have.some((p) => p.name.includes(DEMO_PRODUCTS[d.index].match) && p.brand.includes(d.brand.toLowerCase())));
     return { ...(await getState(todayISO)), demoTodo: todo };
   }
@@ -59,8 +59,10 @@ async function demo(action, body, todayISO) {
     const images = Array.isArray(info.images) ? info.images : [];
     const routine = (await q(`select id from routines where lower(name) = lower($1) limit 1`, [item.routine]))[0];
     const first = images[0];
+    const curated = item.ingredients ? { ingredients: item.ingredients, summary: item.summary, kind: item.kind,
+      confidence: 'high', ai_note: 'Ingredients from the product label.', sources: [] } : {};
     const p = await addProduct({
-      ...info,
+      ...info, ...curated,
       name: item.name, brand: item.brand, area: item.area,
       routine_id: routine?.id || null, started: item.started,
       image_url: first?.url || null,
@@ -73,10 +75,24 @@ async function demo(action, body, todayISO) {
       await stopProduct(p.id, item.stopped, todayISO, 'demo');
       await q(`update events set at = $1 where kind = 'product.stop' and data->>'productId' = $2`, [at(item.stopped, '21:40'), String(p.id)]);
     }
-    return getState(todayISO);
+    return { ...(await getState(todayISO)), demoProductId: p.id };
   }
 
   if (action === 'demo.finish') {
+    // Her skin profile and the trigger she confirmed.
+    await setProfile(DEMO_PROFILE, 'demo');
+    for (const st of DEMO_STATUSES) await setInsightStatus(st.family, st.status, 'demo');
+    // Her own products: give them start dates that fit the story, if they still have the default.
+    for (const o of DEMO_OWN_DATES) {
+      const rows = await q(`select id, name, started, routine_id from products where demo = false and lower(name) like $1`, [`%${o.match}%`]);
+      for (const p of rows) {
+        if (p.started && p.started < '2026-11-01') continue;
+        await q(`update products set started = $1, updated_at = now() where id = $2`, [o.started, p.id]);
+        const shelf = (await q(`select name from routines where id = $1`, [p.routine_id]))[0]?.name;
+        await q(`update events set at = $1, summary = $2 where kind = 'product.add' and data->>'productId' = $3`,
+          [at(o.started, '08:40'), `Added ${p.name}${shelf ? ` to ${shelf}` : ''} · started ${fmtDate(o.started)}`, String(p.id)]);
+      }
+    }
     const have = await q(`select date, area from reactions`);
     for (const r of DEMO_REACTIONS) {
       if (have.some((x) => x.date === r.date && x.area === r.area)) continue;

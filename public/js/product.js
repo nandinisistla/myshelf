@@ -18,7 +18,7 @@ export function openProduct(prod) {
 
   function mainView(p) {
     const st = store.state;
-    const sus = S.suspects();
+    const sus = S.suspectsFor(p);
     const hasSuspect = (p.ingredients || []).filter((i) => sus.has(i.family));
     const susFamilies = [...new Set(hasSuspect.map((i) => i.family))];
     const fine = st.insights.fineProductIds.includes(p.id);

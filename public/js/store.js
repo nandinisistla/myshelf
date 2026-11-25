@@ -56,8 +56,13 @@ export const S = {
   product: (id) => store.state.products.find((p) => p.id === Number(id)),
   routine: (id) => store.state.routines.find((r) => r.id === Number(id)),
   suspects: () => new Set(store.state.insights.suspectFamilies),
+  // Suspect ingredient types for this product's area (fragrance may bother your face but not your body).
+  suspectsFor(p) {
+    const pairs = store.state.insights.suspectPairs || [];
+    return new Set(pairs.filter((x) => x.area === p.area).map((x) => x.family));
+  },
   isSuspectProduct(p) {
-    const sus = this.suspects();
+    const sus = this.suspectsFor(p);
     return (p.ingredients || []).some((i) => sus.has(i.family));
   },
 };
