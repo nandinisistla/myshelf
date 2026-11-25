@@ -28,7 +28,7 @@ export function renderShelf(view) {
 
   const pastBlock = past.length ? h('details', { class: 'past-toggle' },
     h('summary', { class: 'mono', style: 'cursor:pointer;list-style:none' }, 'No longer using', h('span', { class: 'arrow', 'aria-hidden': 'true' }, '↓')),
-    h('div', { class: 'grid', style: 'margin-top:18px' }, past.map((p) => card(p, numberOf)))) : null;
+    h('div', { class: 'grid', style: 'margin-top:18px' }, past.map((p) => productCard(p, numberOf)))) : null;
 
   put(view, getHero(), head, groups, pastBlock);
 }
@@ -44,12 +44,12 @@ function group(r, n, products, numberOf) {
       h('span', { class: 'mono' }, `${pad(products.length)} item${products.length === 1 ? '' : 's'}`),
       r.id ? h('button', { class: 'mono-btn', onclick: () => removeShelf(r) }, 'Remove') : h('span')),
     h('div', { class: 'grid' },
-      products.map((p) => card(p, numberOf)),
+      products.map((p) => productCard(p, numberOf)),
       h('button', { class: 'add-tile', 'aria-label': `Add a product to ${r.name}`, onclick: () => openAdd({ routineId: r.id }) },
         h('div', null, h('b', null, '+'), h('span', null, 'Add product')))));
 }
 
-function card(p, numberOf) {
+export function productCard(p, numberOf) {
   const st = store.state;
   const suspect = S.isSuspectProduct(p);
   const tile = h('div', { class: 'tile' + (p.stopped ? ' stopped' : '') },

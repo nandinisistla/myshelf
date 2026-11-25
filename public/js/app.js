@@ -4,6 +4,7 @@ import { store, load, onChange } from './store.js';
 import { renderShelf } from './shelf.js';
 import { renderHistory } from './history.js';
 import { renderForMe } from './forme.js';
+import { renderSystem } from './system.js';
 import { renderChat, leaveChat } from './chat.js';
 import { openBadDay } from './reaction.js';
 import { openOnboarding, openSettings, initials } from './settings.js';
@@ -16,7 +17,7 @@ import { imageSrc, scoreImage } from './bottle.js';
 
 const view = document.getElementById('view');
 const frame = document.getElementById('frame');
-const TABS = { shelf: renderShelf, history: renderHistory, forme: renderForMe, chat: renderChat };
+const TABS = { shelf: renderShelf, history: renderHistory, forme: renderForMe, chat: renderChat, system: renderSystem };
 let current = null;
 
 function tabFromHash() {

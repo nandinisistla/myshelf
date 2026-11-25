@@ -906,3 +906,30 @@ button.rail-item:hover:not(.on) .n { text-decoration: underline; text-underline-
 .answer .hs-thumb.past::after { display: none; }
 .why-bar em i { font-style: normal; }
 @media (max-width: 700px) { .why-bar em i, .why-calm b { display: none; } .why-bar em { left: 7px; } }
+
+/* ---------- Components page ---------- */
+.sys-part { display: grid; grid-template-columns: 280px 1fr; gap: 40px; padding: 40px 0; border-top: 1px solid var(--rule); }
+.sys-info h2 { margin: 0; font-size: 26px; font-weight: 400; }
+.sys-info p { margin: 8px 0 0; color: var(--ink-2); font-size: 16px; line-height: 1.45; }
+.sys-used { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-top: 14px; }
+.sys-used .mono { font-size: 10.5px; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); margin-right: 4px; }
+.sys-stage { display: grid; gap: 22px; min-width: 0; }
+.sys-stage.tiles { grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); }
+.sys-stage.row { grid-template-columns: repeat(auto-fill, minmax(190px, max-content)); column-gap: 44px; align-items: end; }
+.sys-ask span { white-space: nowrap; }
+.sys-demo .seg button { white-space: nowrap; }
+.sys-stage.stack .answer.compact { margin: 0; }
+.sys-stage.stack .answer.product { margin: 0; }
+.sys-variant { margin: 0; min-width: 0; }
+.sys-demo { min-height: 40px; display: flex; align-items: center; }
+.sys-stage.tiles .sys-demo, .sys-stage.stack .sys-demo { display: block; }
+.sys-variant figcaption { margin-top: 10px; font-size: 10.5px; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
+.sys-ask { border-top: 0; margin: 0; padding: 0; }
+.sys-swatch { width: 56px; height: 56px; border-radius: 14px; display: block; border: 1px solid rgba(0,0,0,.06); }
+.sys-type { font-size: 44px; line-height: 1; }
+.sys-type.mono { font-family: var(--mono); }
+@media (max-width: 820px) { .sys-part { grid-template-columns: 1fr; gap: 20px; } }
+.site-foot { max-width: var(--page); margin: 0 auto; padding: 28px clamp(18px, 4vw, 48px) 40px; text-align: right; }
+.site-foot a { font-family: var(--mono); font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); text-decoration: none; }
+.site-foot a:hover { color: var(--ink); }
+.chat-mode .site-foot { display: none; }
