@@ -1,6 +1,6 @@
-// For me, said with symbols instead of paragraphs.
-//   ● = a bad day (filled: it was in use the week before)   ✓ = fine for you   ✕ = stopped / avoid
-// The counts are exact (code). Every symbol has the full sentence as its tooltip and label.
+// For me: one clear sentence per card, backed by the dots and the product pictures.
+// A row of dots = your bad days on that area, oldest first. Filled = it was in use
+// the week before that bad day. The counts are exact (code).
 import { h, put, toast, fmtDate, daysBetween } from './ui.js';
 import { store, mutate, S } from './store.js';
 import { openProduct } from './product.js';
@@ -13,8 +13,9 @@ import { productHelps, FAMILY_TO_ALLERGEN, allergenMatcher, matches, isWorking, 
 const AREA_WORD = { face: 'face', scalp: 'scalp', body: 'body' };
 const AREA_KEY = { Face: 'face', 'Hair & scalp': 'scalp', Body: 'body' };
 const joinWords = (xs) => xs.length < 2 ? xs.join('') : `${xs.slice(0, -1).join(', ')} and ${xs[xs.length - 1]}`;
-// "In use before 8 of 8 face bad days", short: the number in bold, the meaning in words.
-const frac = (a, b, area = '') => h('span', { class: 'fm-frac' }, 'before ', h('b', null, `${a} of ${b}`), ` ${area ? area + ' ' : ''}bad days`);
+// "all 8 of your face bad days" / "5 of your 8 face bad days"
+const countOf = (n, total, area) => n === total ? `all ${total} of your ${area} bad days` : `${n} of your ${total} ${area} bad days`;
+const plural = (n, one, many) => (n === 1 ? one : many);
 
 export function renderForMe(view) {
   stepNo = 0;
@@ -22,8 +23,7 @@ export function renderForMe(view) {
   const ins = st.insights;
   const head = h('section', { class: 'page-head' },
     h('h1', { class: 'display' }, 'What your skin is telling you', h('span', { class: 'soft' }, '.')),
-    profileStrip(),
-    key());
+    profileStrip());
 
   if (ins.reactionCount < 2) {
     put(view,
@@ -40,15 +40,6 @@ export function renderForMe(view) {
     slide(safeSection(), leftovers(), disclaimer()));
 }
 
-// The three symbols, once, at the top.
-function key() {
-  return h('div', { class: 'fm-key', 'aria-hidden': 'true' },
-    h('span', null, h('i', { class: 'fm-dot on' }), 'used the week before a bad day'),
-    h('span', null, h('i', { class: 'fm-dot' }), 'not used'),
-    h('span', null, h('i', { class: 'sym ok' }, '✓'), 'fine for you'),
-    h('span', null, h('i', { class: 'sym no' }, '✕'), 'stopped'));
-}
-
 // ---------- your profile, at the top ----------
 function profileStrip() {
   const pr = store.state.profile || {};
@@ -59,7 +50,7 @@ function profileStrip() {
       h('div', { class: 'fm-tags' },
         pr.skin_type ? h('span', { class: 'tag' }, pr.skin_type) : null,
         (pr.problems || []).map((x) => h('span', { class: 'tag' }, x)),
-        (pr.allergens || []).map((x) => h('span', { class: 'tag no' }, '✕ ', x)))),
+        (pr.allergens || []).map((x) => h('span', { class: 'tag no' }, `Avoids ${x.toLowerCase()}`)))),
     h('button', { class: 'btn small', onclick: () => openSettings() }, 'Edit'));
 }
 
@@ -82,12 +73,12 @@ function problemsSection() {
       return h('article', { class: 'fm-prob' + (helpers.length ? '' : ' gap') },
         h('div', { class: 'fm-prob-head' }, h('h3', null, pr),
           helpers.length
-            ? h('span', { class: 'sym-badge ok', title: `${helpers.length} product${helpers.length > 1 ? 's' : ''} on your shelf work on this` }, '✓ ', helpers.length)
-            : h('span', { class: 'sym-badge', title: 'Nothing on your shelf works on this yet' }, '—')),
+            ? h('span', { class: 'sym-badge ok' }, `${helpers.length} ${plural(helpers.length, 'product helps', 'products help')}`)
+            : h('span', { class: 'sym-badge' }, 'Nothing yet')),
         helpers.length
           ? h('div', { class: 'fm-thumbs' }, helpers.map(({ p, ings }) => h('button', {
               class: 'fm-thumb', title: `${p.name}: ${ings.join(', ').toLowerCase()}`, 'aria-label': `${p.name}, via ${ings.join(', ')}`, onclick: () => openProduct(p) }, thumb(p, 'lg'))))
-          : h('p', { class: 'fm-look' }, h('span', { class: 'mono' }, 'Look for '), LOOK_FOR[pr] || ''));
+          : h('p', { class: 'fm-look' }, `Look for ${LOOK_FOR[pr] || 'a product made for this'}.`));
     })));
 }
 
@@ -102,19 +93,19 @@ function productsSection() {
     .filter((x) => x.n >= 2 && x.n / x.total >= 0.6).sort((a, b) => b.n - a.n || b.n / b.total - a.n / a.total);
   if (!list.length) return null;
   return h('section', { class: 'fm-step' },
-    stepHead('In use before your bad days'),
+    stepHead('Products in use before your bad days'),
     h('div', { class: 'fm-prods' }, list.map(({ p, n, total }) => {
+      const area = AREA_WORD[p.area];
       const after = p.stopped ? st.reactions.filter((r) => r.area === p.area && r.date > p.stopped).length : 0;
       const calm = p.stopped && after === 0 && daysBetween(p.stopped, st.today) >= 14;
-      return h('button', { class: 'fm-prod', onclick: () => openProduct(p),
-        'aria-label': `${p.name}: in use before ${n} of ${total} ${AREA_WORD[p.area]} bad days${p.stopped ? `, stopped ${fmtDate(p.stopped)}` : ''}${calm ? ', doing good since' : ''}` },
+      return h('button', { class: 'fm-prod', onclick: () => openProduct(p) },
         thumb(p, 'lg'),
         h('div', { class: 'fm-prod-txt' },
           h('div', { class: 'nm' }, p.name),
-          h('div', { class: 'fm-evidence' }, dots(st.reactions.filter((r) => r.area === p.area), (w) => w.productIds.includes(p.id)), frac(n, total, AREA_WORD[p.area])),
-          h('div', { class: 'fm-pills' },
-            p.stopped ? h('span', { class: 'pill-s no' }, '✕ ', fmtDate(p.stopped)) : h('span', { class: 'pill-s warn' }, '● still using'),
-            calm ? h('span', { class: 'pill-s ok' }, '✓ doing good since') : null)));
+          dots(st.reactions.filter((r) => r.area === p.area), (w) => w.productIds.includes(p.id)),
+          h('p', { class: 'fm-line' }, `Used before ${countOf(n, total, area)}.`),
+          h('p', { class: 'fm-line ' + (calm ? 'ok' : p.stopped ? '' : 'warn') },
+            p.stopped ? `${calm ? '✓ ' : ''}Stopped ${fmtDate(p.stopped)}${calm ? '. No bad days since.' : '.'}` : 'Still on your shelf.')));
     })));
 }
 
@@ -133,9 +124,9 @@ function ingredientsSection() {
   const likely = cards.filter((f) => f.status === 'agree' || f.level === 'strong');
   const maybe = cards.filter((f) => !likely.includes(f));
   return h('section', { class: 'fm-step' },
-    stepHead('Likely cause'),
+    stepHead('What might be causing it'),
     likely.length ? h('div', { class: 'fm-ings' }, likely.map((f) => ingredientCard(f, false))) : null,
-    maybe.length ? h('div', { class: 'fm-sub mono' }, 'Maybe') : null,
+    maybe.length ? h('div', { class: 'fm-sub mono' }, 'Less likely · tap to see more') : null,
     maybe.length ? h('div', { class: 'fm-ings' }, maybe.map((f) => ingredientCard(f, true))) : null);
 }
 const rank = (f) => (f.status === 'agree' ? 0 : f.level === 'strong' ? 1 : 2);
@@ -152,9 +143,11 @@ function ingredientCard(f, compact) {
   const area = AREA_WORD[areaKeys[0]] || areaKeys[0];
   const likely = f.status === 'agree' || f.level === 'strong';
   const names = [f.family, ...(f.together || [])];
-  const doubt = fineOnes.length ? `✓ also in ${fineOnes.length} safe product${fineOnes.length > 1 ? 's' : ''}` : f.hits === f.relevant ? '✕ not in anything safe' : 'not every time';
-  const doubtTitle = fineOnes.length ? `Also in ${joinWords(fineOnes.map((p) => p.name))}, which ${fineOnes.length > 1 ? 'have' : 'has'} been fine` : '';
-
+  const sentence = likely
+    ? `It was in your products before ${countOf(f.hits, f.relevant, area)}, and in nothing that works for you.`
+    : fineOnes.length
+      ? `It was there before ${countOf(f.hits, f.relevant, area)}, but ${joinWords(fineOnes.map((p) => p.name))} ${plural(fineOnes.length, 'has', 'have')} it too and ${plural(fineOnes.length, 'works', 'work')} for you.`
+      : `It was there before ${countOf(f.hits, f.relevant, area)}, not every time.`;
   const choose = async (status) => {
     try { await mutate('insight.status', { family: f.family, status: f.status === status ? 'ai' : status }); }
     catch (e) { toast(e.message); }
@@ -163,23 +156,19 @@ function ingredientCard(f, compact) {
 
   const top = [
     h('div', { class: 'fm-ing-head' },
-      h('h3', null, joinWords(names)),
-      h('span', { class: 'fm-badge' + (likely ? ' on' : '') }, f.status === 'agree' ? '✓ You said yes' : likely ? 'Likely' : 'Maybe')),
-    h('div', { class: 'fm-evidence' },
-      dots(st.reactions.filter((r) => areaKeys.includes(r.area)), (w) => w.productIds.some((id) => f.productIds.includes(id))),
-      frac(f.hits, f.relevant, area),
-      h('span', { class: 'pill-s' + (fineOnes.length ? ' ok' : ''), title: doubtTitle }, doubt)),
-    h('p', { class: 'fm-short', title: whyFor(f.family) }, h('span', { class: 'sym info' }, 'i'), whyShort(f.family))];
-
-  // where it is: on this area (stopped ✕ / still using ●) and elsewhere (fine ✓)
+      h('h3', null, likely ? `${joinWords(names)} is the likely trigger` : `${joinWords(names)}: less likely`),
+      f.status === 'agree' ? h('span', { class: 'fm-badge on' }, '✓ You confirmed') : likely ? h('span', { class: 'fm-badge on' }, 'Likely') : h('span', { class: 'fm-badge' }, 'Maybe')),
+    dots(st.reactions.filter((r) => areaKeys.includes(r.area)), (w) => w.productIds.some((id) => f.productIds.includes(id))),
+    h('p', { class: 'fm-line strong' }, sentence),
+    h('p', { class: 'fm-line muted' }, `Why it can irritate: ${whyShort(f.family)}`)];
   const where = h('div', { class: 'fm-where-row' },
-    stopped.length ? h('div', { class: 'fm-group' }, h('span', { class: 'lbl no' }, `✕ ${area}`), thumbs(stopped, 'past')) : null,
-    live.length ? h('div', { class: 'fm-group' }, h('span', { class: 'lbl warn' }, `● ${area}`), thumbs(live, '')) : null,
-    elsewhere.length ? h('div', { class: 'fm-group' }, h('span', { class: 'lbl ok' }, `✓ ${joinWords([...new Set(elsewhere.map((p) => AREA_WORD[p.area]))])}`), thumbs(elsewhere, '')) : null);
+    stopped.length ? h('div', { class: 'fm-group' }, h('span', { class: 'lbl' }, 'You stopped'), thumbs(stopped, 'past')) : null,
+    live.length ? h('div', { class: 'fm-group' }, h('span', { class: 'lbl warn' }, 'Still using'), thumbs(live, '')) : null,
+    elsewhere.length ? h('div', { class: 'fm-group' }, h('span', { class: 'lbl ok' }, `✓ Fine on your ${joinWords([...new Set(elsewhere.map((p) => AREA_WORD[p.area]))])}`), thumbs(elsewhere, '')) : null);
   const ask = h('div', { class: 'fm-ask' },
-    h('span', null, 'Sound right?'),
-    h('button', { class: 'chip' + (f.status === 'agree' ? ' on' : ''), 'aria-label': 'Yes', onclick: () => choose('agree') }, '✓'),
-    h('button', { class: 'chip' + (f.status === 'reject' ? ' on' : ''), 'aria-label': 'No', onclick: () => choose('reject') }, '✕'));
+    h('span', null, 'Does this sound right?'),
+    h('button', { class: 'chip' + (f.status === 'agree' ? ' on' : ''), onclick: () => choose('agree') }, 'Yes'),
+    h('button', { class: 'chip' + (f.status === 'reject' ? ' on' : ''), onclick: () => choose('reject') }, 'No'));
 
   if (compact) return h('details', { class: 'fm-ing maybe' }, h('summary', null, top), where, ask);
   return h('article', { class: 'fm-ing' + (likely ? ' likely' : '') }, top, where, ask);
@@ -224,20 +213,23 @@ function avoidSection() {
     const keep = withIt.filter((p) => !p.stopped && isWorking(p));
     const stopped = withIt.filter((p) => p.stopped && (!area || p.area === area));
     const where = area ? AREA_WORD[area] : 'shelf';
+    const reason = [
+      f ? `It was in your products before ${countOf(f.hits, f.relevant, AREA_WORD[area])}.` : null,
+      f?.status === 'agree' ? 'You confirmed it.' : null,
+      it.listed ? 'It’s on your allergen list.' : null].filter(Boolean).join(' ');
+    const status = stillIn.length
+      ? `It’s still in ${joinWords(stillIn.map((p) => p.name))}. Try a version without it.`
+      : keep.length
+        ? `✓ You’ve stopped it${area ? ` on your ${where}` : ''}. It’s only left in products that work for you.`
+        : `✓ Nothing you use${area ? ` on your ${where}` : ''} has it any more.`;
     return h('article', { class: 'fm-avoid-item' },
-      h('div', { class: 'fm-avoid-head' },
-        h('h3', null, it.label, area ? h('span', { class: 'fm-area' }, ` · ${AREA_WORD[area]}`) : null),
-        stillIn.length
-          ? h('span', { class: 'sym-badge warn', title: 'Still in something you use' }, `● still on your ${where}`)
-          : h('span', { class: 'sym-badge ok', title: `Not in anything you use on your ${where} that bothers you` }, `✓ off your ${where}`)),
-      h('div', { class: 'fm-pills' },
-        f ? h('span', { class: 'pill-s' }, h('i', { class: 'fm-dot on' }), ` before ${f.hits} of ${f.relevant} bad days`) : null,
-        f?.status === 'agree' ? h('span', { class: 'pill-s' }, '✓ confirmed') : null,
-        it.listed ? h('span', { class: 'pill-s' }, '✕ your allergen') : null),
+      h('h3', null, it.label, area ? h('span', { class: 'fm-area' }, ` on your ${where}`) : null),
+      h('p', { class: 'fm-line strong ' + (stillIn.length ? 'warn' : 'ok') }, status),
+      h('p', { class: 'fm-line muted' }, reason),
       h('div', { class: 'fm-where-row' },
-        stillIn.length ? h('div', { class: 'fm-group' }, h('span', { class: 'lbl warn', title: 'Try a version without it' }, '● swap'), thumbs(stillIn, '')) : null,
-        stopped.length ? h('div', { class: 'fm-group' }, h('span', { class: 'lbl no' }, '✕ stopped'), thumbs(stopped, 'past')) : null,
-        keep.length ? h('div', { class: 'fm-group' }, h('span', { class: 'lbl ok', title: 'They have it too, but your skin is fine with them, so keep them' }, `✓ keep · ${joinWords([...new Set(keep.map((p) => AREA_WORD[p.area]))])}`), thumbs(keep, '')) : null));
+        stillIn.length ? h('div', { class: 'fm-group' }, h('span', { class: 'lbl warn' }, 'Swap'), thumbs(stillIn, '')) : null,
+        stopped.length ? h('div', { class: 'fm-group' }, h('span', { class: 'lbl' }, 'You stopped'), thumbs(stopped, 'past')) : null,
+        keep.length ? h('div', { class: 'fm-group' }, h('span', { class: 'lbl ok' }, `✓ Keep: your ${joinWords([...new Set(keep.map((p) => AREA_WORD[p.area]))])} is fine with ${plural(keep.length, 'it', 'them')}`), thumbs(keep, '')) : null));
   });
 
   let watch = null;
@@ -247,15 +239,16 @@ function avoidSection() {
     const cleared = [];
     for (const w of WATCH_LIST) {
       const inWorking = face.filter((p) => !p.stopped && isWorking(p) && contains(p, w.test));
-      if (inWorking.length) { cleared.push(h('span', { class: 'wchip ok', title: `In ${joinWords(inWorking.map((p) => p.name))}, which works for you` }, '✓ ', w.label)); continue; }
+      if (inWorking.length) { cleared.push(`${w.label.toLowerCase()} (in your ${joinWords(inWorking.map((p) => p.name))})`); continue; }
       const past = face.filter((p) => p.stopped && contains(p, w.test));
-      chips.push(h('span', { class: 'wchip', tabindex: '0', title: w.why + (past.length ? ` It was in ${joinWords(past.map((p) => p.name))}, which you stopped.` : '') },
-        '✕ ', w.label, past.length ? h('i', { class: 'was' }, ' · was in yours') : null));
+      chips.push(h('li', null, h('b', null, w.label), ' ', h('span', { class: 'muted' }, w.why),
+        past.length ? h('span', { class: 'was' }, ` It was in your ${joinWords(past.map((p) => p.name))}.`) : null));
     }
     watch = h('div', { class: 'fm-watch' },
-      h('h3', null, 'New face products: skip'),
-      h('div', { class: 'wchips' }, chips, cleared),
-      h('p', { class: 'fm-src' }, 'From dermatologist advice for redness-prone skin · ',
+      h('h3', null, 'When you buy something new for your face, skip these'),
+      h('ul', null, chips),
+      cleared.length ? h('p', { class: 'fm-line ok' }, `✓ No need to skip ${joinWords(cleared)}: it works for you.`) : null,
+      h('p', { class: 'fm-src' }, 'Based on dermatologist advice for redness-prone skin: ',
         WATCH_SOURCES.map((x, n) => [n ? ' · ' : '', h('a', { href: x.url, target: '_blank', rel: 'noopener' }, x.title.split(':')[0])])));
   }
   return h('section', { class: 'fm-step' },
@@ -269,9 +262,10 @@ function safeSection() {
   const fine = store.state.insights.fineProductIds.map((id) => S.product(id)).filter(Boolean);
   if (!fine.length) return null;
   return h('section', { class: 'fm-step' },
-    stepHead('Safe for you', h('span', { class: 'fm-head-note' }, '✓ 2+ weeks, no bad days')),
+    stepHead('Safe for you'),
+    h('p', { class: 'fm-line muted', style: 'margin:-6px 0 16px' }, 'You’ve used these for at least two weeks with no bad days.'),
     h('div', { class: 'fm-safe' }, fine.map((p) => h('button', { class: 'fm-safe-item', onclick: () => openProduct(p) },
-      h('span', { class: 'fm-safe-check', 'aria-hidden': 'true' }, '✓'), thumb(p, 'lg'), h('span', null, p.name)))));
+      thumb(p, 'lg'), h('span', null, p.name)))));
 }
 
 function leftovers() {
@@ -280,9 +274,9 @@ function leftovers() {
   const common = ins.families.filter((f) => f.level === 'too-common');
   if (!ruled.length && !common.length) return null;
   return h('div', { class: 'fm-leftovers' },
-    ruled.length ? h('p', null, h('b', null, '✕ Ruled out: '), ruled.map((f, i) => [i ? ', ' : '',
+    ruled.length ? h('p', null, h('b', null, 'You ruled out: '), ruled.map((f, i) => [i ? ', ' : '',
       h('button', { class: 'link', title: 'Tap to undo', onclick: () => mutate('insight.status', { family: f.family, status: 'ai' }) }, f.family)])) : null,
-    common.length ? h('p', { class: 'muted' }, `In almost everything you use, so can’t tell: ${joinWords(common.map((f) => f.family.toLowerCase()))}.`) : null);
+    common.length ? h('p', { class: 'muted' }, `${joinWords(common.map((f) => f.family))} ${plural(common.length, 'is', 'are')} in almost everything you use, so ${plural(common.length, 'it', 'they')} can’t be blamed or cleared.`) : null);
 }
 
 let stepNo = 0;

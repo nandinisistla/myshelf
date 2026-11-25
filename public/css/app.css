@@ -783,3 +783,13 @@ button.rail-item:hover:not(.on) .n { text-decoration: underline; text-underline-
 .fm-frac { font-size: 14.5px; color: var(--muted); }
 .fm-frac b { color: var(--ink); font-size: 15px; }
 .fm-key .fm-dot:not(.on) { border: 1.5px solid var(--amber); background: transparent; }
+/* one clear sentence per line */
+.fm-line { margin: 8px 0 0; font-size: 15.5px; line-height: 1.45; max-width: 760px; }
+.fm-line.strong { color: var(--ink); }
+.fm-line.ok { color: #2f5a39; }
+.fm-line.warn { color: var(--amber-ink); }
+.fm-line.muted { color: var(--muted); font-size: 14.5px; }
+.fm-prod .fm-dots { margin-top: 10px; }
+.fm-ing .fm-dots { margin-top: 12px; }
+.fm-watch .was { color: var(--amber-ink); }
+.fm-group .lbl { text-transform: none; letter-spacing: 0; font-family: inherit; font-size: 14px; }
