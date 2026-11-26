@@ -11,7 +11,6 @@ import { openOnboarding, openSettings, initials } from './settings.js';
 import { findPhotos, admin } from './store.js';
 import { loadDemo, fillDemo } from './demo.js';
 import { startBlobs } from './blob.js';
-import { startSlides } from './slides.js';
 import { startEffects, newView } from './effects.js';
 import { imageSrc, scoreImage } from './bottle.js';
 
@@ -49,7 +48,6 @@ onChange(() => render(true));
 document.getElementById('badDayBtn').addEventListener('click', () => openBadDay());
 document.getElementById('profileBtn').addEventListener('click', () => openSettings());
 startBlobs();
-startSlides();
 startEffects();
 // Show your initials on the profile button once you have a name.
 onChange((st) => {

@@ -703,8 +703,9 @@ button.rail-item:hover:not(.on) .n { text-decoration: underline; text-underline-
 }
 @media (prefers-reduced-motion: reduce) { .tagline.melting .melt { animation: none; opacity: 0; } .tagline .melt { transition: width .3s; } }
 /* For me: each step is its own screen-sized slide */
-#view .slide { min-height: calc(100dvh - var(--nav)); box-sizing: border-box; padding: 32px 0 28px; }
-#view .slide:last-child { min-height: 0; padding-bottom: 80px; }
+/* For me: plain, continuous scrolling; each step is just a section with room around it */
+#view .slide { padding: 40px 0 24px; }
+#view .slide:last-child { padding-bottom: 80px; }
 #view .slide > .fm-step:first-child { margin-top: 0; }
 #view .slide > .page-head { padding-top: 16px; padding-bottom: 8px; }
 #view .slide > .fm-step + .fm-step { margin-top: 56px; }
